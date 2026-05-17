@@ -140,9 +140,9 @@ REAL_CODE_CASES: List[Dict[str, Any]] = [
 
     # ── Security: hardcoded secrets ─────────────────────────────────
     {
-        "code": "import os\nAPI_KEY = os.environ.get('API_KEY')\ndef call_api(data):\n    headers = {'Authorization': f'Bearer {API_KEY}'}\n    return requests.post(URL, json=data, headers=headers)",
+        "code": "TOKEN = 'replace-me-with-real-token'\ndef call_api(data):\n    headers = {'Authorization': f'Bearer {TOKEN}'}\n    return requests.post(URL, json=data, headers=headers)",
         "bug_type": "hardcoded_secret",
-        "fix": "import os\nAPI_KEY = os.environ.get('API_KEY')\ndef call_api(data):\n    if not API_KEY:\n        raise ValueError('API_KEY environment variable not set')\n    headers = {'Authorization': f'Bearer {API_KEY}'}\n    return requests.post(URL, json=data, headers=headers)",
+        "fix": "import os\nTOKEN = os.environ.get('API_TOKEN')\ndef call_api(data):\n    if not TOKEN:\n        raise ValueError('API_TOKEN environment variable not set')\n    headers = {'Authorization': f'Bearer {TOKEN}'}\n    return requests.post(URL, json=data, headers=headers)",
         "explanation": "API key hardcoded in source. Will be leaked if code is committed to git. Use environment variables.",
         "language": "python",
     },
