@@ -18,7 +18,7 @@ import json
 import os
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from cognicore.agents.base_agent import BaseAgent
 
 logger = logging.getLogger("cognicore.agents.company_models")
@@ -120,7 +120,7 @@ class OpenAIAgent(BaseAgent):
             except ImportError:
                 raise ImportError(
                     "OpenAI not installed. Run: pip install openai\n"
-                    "Then set: export OPENAI_API_KEY='your-key'"
+                    "Then set OPENAI_API_KEY in your environment."
                 )
             if not self.api_key:
                 raise ValueError(
@@ -181,7 +181,7 @@ class GeminiAgent(BaseAgent):
             except ImportError:
                 raise ImportError(
                     "Google GenAI not installed. Run: pip install google-genai\n"
-                    "Then set: export GEMINI_API_KEY='your-key'"
+                    "Then set GEMINI_API_KEY in your environment."
                 )
             if not self.api_key:
                 raise ValueError(
@@ -240,7 +240,7 @@ class ClaudeAgent(BaseAgent):
             except ImportError:
                 raise ImportError(
                     "Anthropic not installed. Run: pip install anthropic\n"
-                    "Then set: export ANTHROPIC_API_KEY='your-key'"
+                    "Then set ANTHROPIC_API_KEY in your environment."
                 )
             if not self.api_key:
                 raise ValueError(

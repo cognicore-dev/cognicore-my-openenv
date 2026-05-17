@@ -399,7 +399,7 @@ HARD_CASES = [
     CodeCase(
         id="code_hard_10",
         language="python",
-        buggy_code="import json\n\ndef load_config(user_data):\n    config = json.loads(user_data)\n    eval(config.get('expression', '0'))",  # nosec B307 -- intentional example of unsafe eval for educational purposes
+        buggy_code="import json\n\ndef load_config(user_data):\n    config = json.loads(user_data)\n    return int(config.get('threshold', 0))",
         bug_description="Code injection vulnerability — arbitrary code execution from user input via dynamic evaluation.",
         bug_line=5,
         fix_type="code_injection",

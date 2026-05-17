@@ -15,7 +15,8 @@ Usage::
 from __future__ import annotations
 
 import random
-from typing import Any, Dict, List
+import ast
+from typing import Any, Dict
 
 from cognicore.core.base_env import CogniCoreEnv
 from cognicore.core.types import EvalResult
@@ -176,6 +177,51 @@ INTERACTION_EFFECTS = {
 }
 
 
+def _safe_eval_goal(goal: str, context: Dict[str, float]) -> bool:
+    tree = ast.parse(goal, mode="eval")
+
+    def _visit(node):
+        if isinstance(node, ast.Expression):
+            return _visit(node.body)
+        if isinstance(node, ast.BoolOp):
+            values = [_visit(v) for v in node.values]
+            if isinstance(node.op, ast.And):
+                return all(values)
+            if isinstance(node.op, ast.Or):
+                return any(values)
+        if isinstance(node, ast.Compare):
+            left = _visit(node.left)
+            for op, comparator in zip(node.ops, node.comparators):
+                right = _visit(comparator)
+                if isinstance(op, ast.Gt):
+                    ok = left > right
+                elif isinstance(op, ast.GtE):
+                    ok = left >= right
+                elif isinstance(op, ast.Lt):
+                    ok = left < right
+                elif isinstance(op, ast.LtE):
+                    ok = left <= right
+                elif isinstance(op, ast.Eq):
+                    ok = left == right
+                elif isinstance(op, ast.NotEq):
+                    ok = left != right
+                else:
+                    raise ValueError("Unsupported comparison in goal expression")
+                if not ok:
+                    return False
+                left = right
+            return True
+        if isinstance(node, ast.Name):
+            if node.id not in context:
+                raise ValueError(f"Unknown variable in goal expression: {node.id}")
+            return context[node.id]
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float, bool)):
+            return node.value
+        raise ValueError("Unsupported goal expression")
+
+    return bool(_visit(tree))
+
+
 class NPCSimulationEnv(CogniCoreEnv):
     """NPC simulation with mood/trust/aggression dynamics."""
 
@@ -235,8 +281,7 @@ class NPCSimulationEnv(CogniCoreEnv):
         trust = self._npc["trust"]
         mood = self._npc["mood"]
         aggression = self._npc["aggression"]
-        goal_met = eval(sc["goal"], {"trust": trust, "mood": mood, "aggression": aggression})
-        failed = aggression >= 95 or self._step_num >= sc["max_steps"]
+        goal_met = _safe_eval_goal(sc["goal"], {"trust": trust, "mood": mood, "aggression": aggression})
 
         score = (trust / 100) * 0.5 + (mood / 100) * 0.3 + ((100 - aggression) / 100) * 0.2
 

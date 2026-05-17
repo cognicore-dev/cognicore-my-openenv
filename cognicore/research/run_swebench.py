@@ -8,7 +8,7 @@ Usage:
   python -m cognicore.research.run_swebench --ablation      # ablation study
   python -m cognicore.research.run_swebench --seeds 5       # multi-seed stats
 """
-import sys, os, io, argparse, json, math, random, time, uuid
+import sys, os, io, argparse, json, math, random, time, uuid, subprocess
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
@@ -35,11 +35,18 @@ def clog(tag, msg, detail=""):
             print(f"         {l}")
 
 def sandbox(code, tests):
-    ns = {}
     try:
-        exec(compile(code, "<patch>", "exec"), ns)
-        exec(compile(tests, "<test>", "exec"), ns)
-        return True, None
+        result = subprocess.run(
+            [sys.executable, "-c", f"{code}\n\n{tests}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        if result.returncode == 0:
+            return True, None
+        output = (result.stderr or result.stdout or "").strip()
+        return False, output.splitlines()[-1] if output else f"Exit code {result.returncode}"
     except Exception as e:
         return False, f"{type(e).__name__}: {e}"
 

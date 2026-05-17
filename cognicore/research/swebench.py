@@ -87,7 +87,7 @@ SWEBENCH_TASKS = [
    "description":"Shallow copy of _cookies mutates original.",
    "fix_hint":"Use .copy() for _cookies",
    "buggy_code":"class PreparedRequest:\n    def __init__(s):\n        s.method=None;s.url=None;s.headers={};s._cookies={}\n    def prepare(s,method,url,headers=None,cookies=None):\n        s.method=method;s.url=url;s.headers=headers or {};s._cookies=cookies or {}\n    def copy(s):\n        p=PreparedRequest();p.method=s.method;p.url=s.url\n        p.headers=s.headers.copy();p._cookies=s._cookies\n        return p",
-   "test_code":"r=PreparedRequest();r.prepare('GET','http://x.com',cookies={'s':'1'})\nc=r.copy();c._cookies['t']='2'\nassert 't' not in r._cookies\nassert c._cookies['s']=='1'"},
+   "test_code":"r=PreparedRequest();r.prepare('GET','https://x.com',cookies={'s':'1'})\nc=r.copy();c._cookies['t']='2'\nassert 't' not in r._cookies\nassert c._cookies['s']=='1'"},
 
   {"id":"SWE-req-4356","repo":"psf/requests","category":"encoding",
    "issue":"Response encoding detection fails for empty body",

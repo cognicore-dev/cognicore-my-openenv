@@ -12,8 +12,8 @@ Each task contains:
 The agent must produce fixed code that passes the test.
 """
 from __future__ import annotations
-import sys, io, traceback
-from typing import Any, Callable, Dict
+import subprocess
+import sys
 from cognicore.realbench.runner import BenchmarkRunner
 
 # ─────────────────────────────────────────────────────────────
@@ -259,13 +259,18 @@ assert c.value >= 95, f"Counter should be ~100, got {c.value} (race condition)"
 
 def execute_code_safely(code: str, test_code: str) -> tuple[bool, str]:
     """Execute code + test in isolated namespace. Returns (passed, error)."""
-    namespace = {}
     try:
-        # Execute the fixed code
-        exec(code, namespace)
-        # Execute the tests
-        exec(test_code, namespace)
-        return True, ""
+        result = subprocess.run(
+            [sys.executable, "-c", f"{code}\n\n{test_code}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        if result.returncode == 0:
+            return True, ""
+        output = (result.stderr or result.stdout or "").strip()
+        return False, output.splitlines()[-1] if output else f"Exit code {result.returncode}"
     except Exception as e:
         return False, f"{type(e).__name__}: {e}"
 
