@@ -26,46 +26,72 @@ def extract_code(text: str) -> str:
 
 
 class LLMCoderAgent(BaseAgent):
-    """Generates patches using a real LLM (Gemini/OpenAI/Claude)."""
+    """Generates patches using a real LLM with rule-based fallback."""
 
-    def __init__(self, llm: LLMClient = None):
+    def __init__(self, llm: LLMClient = None, fix_db=None):
         model_name = "rule-based"
         self.llm = llm or LLMClient(provider="auto")
+        self.fix_db = fix_db or {}
         if self.llm.available:
             model_name = self.llm.model
         super().__init__(AgentRole.CODER, model_name)
+        self.llm_successes = 0
+        self.llm_failures = 0
 
     def _run(self, ctx: AgentContext) -> AgentResult:
-        if not self.llm.available:
-            return AgentResult(
-                role=self.role, success=False,
-                error="No LLM available", tokens_in=0, tokens_out=0)
+        # Try LLM first
+        if self.llm.available:
+            prompt = self._build_prompt(ctx)
+            tokens_in = len(prompt) // 4
 
-        # Build prompt with CogniCore memory + reflection
-        prompt = self._build_prompt(ctx)
-        tokens_in = len(prompt) // 4  # rough estimate
+            response = self.llm.generate(prompt, temperature=0.3)
+            if response:
+                code = extract_code(response)
+                tokens_out = len(response) // 4
+                if code and len(code.strip()) >= 10:
+                    self.llm_successes += 1
+                    return AgentResult(
+                        role=self.role, success=True, output=code,
+                        artifacts={"tactic": "llm_repair", "model": self.llm.model},
+                        tokens_in=tokens_in, tokens_out=tokens_out)
 
-        response = self.llm.generate(prompt, temperature=0.3)
-        if not response:
-            return AgentResult(
-                role=self.role, success=False,
-                error="LLM returned empty response",
-                tokens_in=tokens_in, tokens_out=0)
+            self.llm_failures += 1
 
-        code = extract_code(response)
-        tokens_out = len(response) // 4
+        # Fallback to rule-based fixes
+        return self._rule_based_fallback(ctx)
 
-        if not code or len(code.strip()) < 10:
-            return AgentResult(
-                role=self.role, success=False, output=response[:200],
-                error="Could not extract valid code",
-                artifacts={"tactic": "llm_fail", "raw_response": response[:300]},
-                tokens_in=tokens_in, tokens_out=tokens_out)
+    def _rule_based_fallback(self, ctx: AgentContext) -> AgentResult:
+        """Fall back to rule-based fix database when LLM unavailable."""
+        from cognicore.research.patch_intelligence import patch_hash
+        fixes = self.fix_db.get(ctx.task_id, {})
+        failed_hashes = {patch_hash(p.get("patch", "")) for p in ctx.previous_patches}
+
+        disabled = set()
+        for h in ctx.memory_hints:
+            if "'guard' failed" in h:
+                disabled.add("guard")
+
+        strategy = "rewrite" if ctx.attempt > 1 else "guard"
+        if strategy in disabled:
+            strategy = "rewrite"
+
+        order = [strategy] + [t for t in fixes if t != strategy and t not in disabled]
+        for tactic in order:
+            if tactic in fixes:
+                try:
+                    patch = fixes[tactic](ctx.buggy_code)
+                    if patch and patch_hash(patch) not in failed_hashes:
+                        return AgentResult(
+                            role=self.role, success=True, output=patch,
+                            artifacts={"tactic": f"rule:{tactic}"},
+                            tokens_in=len(ctx.buggy_code), tokens_out=len(patch))
+                except Exception:
+                    continue
 
         return AgentResult(
-            role=self.role, success=True, output=code,
-            artifacts={"tactic": "llm_repair", "model": self.llm.model},
-            tokens_in=tokens_in, tokens_out=tokens_out)
+            role=self.role, success=False, output=ctx.buggy_code,
+            artifacts={"tactic": "exhausted"}, error="No viable fix",
+            tokens_in=len(ctx.buggy_code), tokens_out=0)
 
     def _build_prompt(self, ctx: AgentContext) -> str:
         parts = [

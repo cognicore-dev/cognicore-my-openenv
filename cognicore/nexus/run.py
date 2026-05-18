@@ -45,7 +45,7 @@ def build_registry(runtime=None, persistent=None, isolated=False, use_llm=False)
         llm = LLMClient(provider="auto")
         if llm.available:
             cprint("LLM", f"Using {llm.provider}/{llm.model} for code generation")
-            reg.register(LLMCoderAgent(llm=llm))
+            reg.register(LLMCoderAgent(llm=llm, fix_db=FIXES))
             reg.register(LLMReviewerAgent(llm=llm))
         else:
             cprint("LLM", "No LLM available, falling back to rule-based")
