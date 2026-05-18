@@ -3,9 +3,11 @@
 NEXUS Runner — Multi-agent autonomous SWE benchmark.
 
 Usage:
-  python -m cognicore.nexus.run                    # standard run
-  python -m cognicore.nexus.run --policy test_first # different routing
-  python -m cognicore.nexus.run --compare           # compare all policies
+  python -m cognicore.nexus.run                    # standard (rule-based)
+  python -m cognicore.nexus.run --llm               # real LLM agents
+  python -m cognicore.nexus.run --policy test_first  # different routing
+  python -m cognicore.nexus.run --compare            # compare all policies
+  python -m cognicore.nexus.run --llm --compare      # compare with LLM
 """
 import sys, os, argparse, json, time, uuid
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -32,19 +34,33 @@ def cprint(tag, msg, color="37"):
     print(f"  \033[{c}m[{tag}]\033[0m {msg}")
 
 
-def build_registry(runtime=None, persistent=None, isolated=False):
+def build_registry(runtime=None, persistent=None, isolated=False, use_llm=False):
     """Build the full agent registry."""
     reg = AgentRegistry()
     reg.register(MemoryAgent(runtime=runtime, persistent_store=persistent))
     reg.register(PlannerAgent())
-    reg.register(CoderAgent(fix_db=FIXES))
-    reg.register(ReviewerAgent(similarity_threshold=0.85))
+    if use_llm:
+        from cognicore.nexus.llm_agents import LLMCoderAgent, LLMReviewerAgent
+        from cognicore.research.llm_client import LLMClient
+        llm = LLMClient(provider="auto")
+        if llm.available:
+            cprint("LLM", f"Using {llm.provider}/{llm.model} for code generation")
+            reg.register(LLMCoderAgent(llm=llm))
+            reg.register(LLMReviewerAgent(llm=llm))
+        else:
+            cprint("LLM", "No LLM available, falling back to rule-based")
+            reg.register(CoderAgent(fix_db=FIXES))
+            reg.register(ReviewerAgent(similarity_threshold=0.85))
+    else:
+        reg.register(CoderAgent(fix_db=FIXES))
+        reg.register(ReviewerAgent(similarity_threshold=0.85))
     reg.register(TesterAgent(isolated=isolated))
     reg.register(VerifierAgent())
     return reg
 
 
-def run_nexus(policy="standard", max_attempts=5, isolated=False, quiet=False):
+def run_nexus(policy="standard", max_attempts=5, isolated=False, quiet=False,
+              use_llm=False):
     """Run NEXUS multi-agent pipeline on all SWE-bench tasks."""
     tasks = load_swebench_tasks()
     runtime = CogniCoreRuntime(config=RuntimeConfig(
@@ -52,7 +68,7 @@ def run_nexus(policy="standard", max_attempts=5, isolated=False, quiet=False):
     ), name=f"nexus-{SESSION}")
     persistent = PersistentCognitionStore()
     tracker = TokenTracker(budget_tokens=1000000, budget_usd=50.0)
-    registry = build_registry(runtime, persistent, isolated)
+    registry = build_registry(runtime, persistent, isolated, use_llm=use_llm)
     bus = CoordinationBus(registry, tracker, policy=policy, max_messages=15)
     traj_store = TrajectoryStore()
 
@@ -162,7 +178,7 @@ def run_nexus(policy="standard", max_attempts=5, isolated=False, quiet=False):
             "token_total": tracker.total_tokens, "cost_total": tracker.total_cost}
 
 
-def compare_policies(max_attempts=5):
+def compare_policies(max_attempts=5, use_llm=False):
     """Compare all routing policies head-to-head."""
     print(f"\n{'='*72}")
     print(f"  NEXUS POLICY COMPARISON")
@@ -172,7 +188,8 @@ def compare_policies(max_attempts=5):
     for policy in ["minimal", "standard", "test_first", "review_first"]:
         # Clear persistent store between policies for fair comparison
         PersistentCognitionStore().clear()
-        r = run_nexus(policy=policy, max_attempts=max_attempts, quiet=True)
+        r = run_nexus(policy=policy, max_attempts=max_attempts, quiet=True,
+                      use_llm=use_llm)
         all_results[policy] = r
         print(f"  {policy:<15} solved={r['solved']}/{r['total']}  "
               f"tokens={r['token_total']:>8,}  cost=${r['cost_total']:.4f}")
@@ -195,10 +212,12 @@ if __name__ == "__main__":
                    choices=["minimal", "standard", "test_first", "review_first"])
     p.add_argument("--attempts", type=int, default=5)
     p.add_argument("--isolated", action="store_true")
+    p.add_argument("--llm", action="store_true", help="Use real LLM agents")
     p.add_argument("--compare", action="store_true", help="Compare all policies")
     a = p.parse_args()
 
     if a.compare:
-        compare_policies(a.attempts)
+        compare_policies(a.attempts, use_llm=a.llm)
     else:
-        run_nexus(policy=a.policy, max_attempts=a.attempts, isolated=a.isolated)
+        run_nexus(policy=a.policy, max_attempts=a.attempts,
+                  isolated=a.isolated, use_llm=a.llm)
