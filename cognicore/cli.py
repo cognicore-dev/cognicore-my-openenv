@@ -6,6 +6,7 @@ Usage:
     python -m cognicore.cli benchmark --env GridWorld-v0
     python -m cognicore.cli list
     python -m cognicore.cli arena --envs MazeRunner-v0,GridWorld-v0
+    python -m cognicore.cli ui   # Start NEXUS dashboard
 """
 import argparse
 import sys
@@ -102,6 +103,37 @@ def cmd_arena(args):
     arena.print_leaderboard()
 
 
+def cmd_ui(args):
+    from cognicore.ui.server import start_server
+    port = getattr(args, 'port', 7842)
+    start_server(port=port, open_browser=True)
+
+
+def cmd_integrations(args):
+    action = getattr(args, 'action', 'status')
+    if action == 'setup':
+        from cognicore.integrations.setup_wizard import setup_wizard
+        setup_wizard()
+    elif action == 'test':
+        from cognicore.integrations.setup_wizard import test_connections
+        test_connections()
+    elif action == 'status':
+        from cognicore.integrations.task_queue import NexusTaskQueue
+        q = NexusTaskQueue()
+        s = q.stats()
+        print("\n  NEXUS Integration Status")
+        print(f"  Tasks: {s['total']} | Dead letter: {s['dead_letter']}")
+        print(f"  By status: {s['by_status']}")
+        print(f"  By source: {s['by_source']}\n")
+
+
+def cmd_webhooks(args):
+    from cognicore.ui.server import start_server
+    port = getattr(args, 'port', 7842)
+    print("  Starting webhook server (includes dashboard)...")
+    start_server(port=port, open_browser=False)
+
+
 def main():
     p = argparse.ArgumentParser(prog="cognicore")
     sub = p.add_subparsers(dest="command")
@@ -115,8 +147,16 @@ def main():
     b.add_argument("--env", required=True); b.add_argument("--steps", type=int, default=50000)
     a = sub.add_parser("arena", help="ELO tournament")
     a.add_argument("--envs", required=True); a.add_argument("--episodes", type=int, default=20)
+    u = sub.add_parser("ui", help="Start NEXUS dashboard")
+    u.add_argument("--port", type=int, default=7842)
+    i = sub.add_parser("integrations", help="Manage integrations")
+    i.add_argument("action", nargs="?", default="status", choices=["setup", "test", "status"])
+    w = sub.add_parser("webhooks", help="Start webhook server")
+    w.add_argument("--port", type=int, default=7842)
     args = p.parse_args()
-    cmds = {"list": cmd_list, "train": cmd_train, "benchmark": cmd_benchmark, "arena": cmd_arena}
+    cmds = {"list": cmd_list, "train": cmd_train, "benchmark": cmd_benchmark,
+            "arena": cmd_arena, "ui": cmd_ui, "integrations": cmd_integrations,
+            "webhooks": cmd_webhooks}
     if args.command in cmds:
         cmds[args.command](args)
     else:

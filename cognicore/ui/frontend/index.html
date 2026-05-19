@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NEXUS — Autonomous Engineering OS</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a0a;--bg2:#111;--bg3:#1a1a1a;--border:#1f2937;--text:#e5e7eb;--text2:#9ca3af;--accent:#3b82f6;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--purple:#a855f7}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+
+/* Sidebar */
+.sidebar{width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;height:100vh;z-index:10}
+.sidebar .logo{padding:20px;font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border)}
+.sidebar .logo span{background:linear-gradient(135deg,var(--accent),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sidebar nav{flex:1;padding:8px}
+.sidebar nav a{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;color:var(--text2);font-size:14px;font-weight:500;transition:all .15s}
+.sidebar nav a:hover,.sidebar nav a.active{background:var(--bg3);color:var(--text)}
+.sidebar nav a.active{color:var(--accent);background:rgba(59,130,246,.1)}
+.sidebar nav a i{font-size:18px;width:20px;text-align:center}
+.sidebar .bottom{padding:14px;border-top:1px solid var(--border);font-size:12px;color:var(--text2)}
+
+/* Header */
+.header{height:56px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:fixed;left:220px;right:0;top:0;z-index:9}
+.header .status{display:flex;align-items:center;gap:6px;font-size:13px}
+.header .status .dot{width:8px;height:8px;border-radius:50%;background:var(--red)}
+.header .status .dot.live{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.header .right{display:flex;align-items:center;gap:16px;font-size:13px;color:var(--text2)}
+.header .right .cost{color:var(--green);font-weight:600}
+
+/* Main */
+.main{margin-left:220px;margin-top:56px;padding:24px;flex:1;min-height:calc(100vh - 56px)}
+
+/* Cards */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;transition:border-color .2s}
+.stat-card:hover{border-color:var(--accent)}
+.stat-card .label{font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.stat-card .value{font-size:28px;font-weight:700}
+.stat-card .sub{font-size:12px;color:var(--text2);margin-top:4px}
+.stat-card.accent .value{color:var(--accent)}
+.stat-card.green .value{color:var(--green)}
+.stat-card.yellow .value{color:var(--yellow)}
+.stat-card.purple .value{color:var(--purple)}
+
+/* Grid layouts */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.grid-3{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:24px}
+
+/* Panel */
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+.panel h3{font-size:14px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.panel h3 i{color:var(--accent)}
+
+/* Table */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:10px 12px;color:var(--text2);font-weight:500;border-bottom:1px solid var(--border);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+td{padding:10px 12px;border-bottom:1px solid rgba(31,41,55,.5)}
+tr:hover td{background:rgba(59,130,246,.03)}
+tr{cursor:pointer}
+
+/* Badges */
+.badge{padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600}
+.badge.solved{background:rgba(34,197,94,.15);color:var(--green)}
+.badge.failed{background:rgba(239,68,68,.15);color:var(--red)}
+.badge.running{background:rgba(59,130,246,.15);color:var(--accent);animation:pulse 2s infinite}
+
+/* Pipeline */
+.pipeline{display:flex;align-items:center;gap:4px;margin:20px 0}
+.pipeline .step{padding:8px 14px;border-radius:8px;font-size:12px;font-weight:600;background:var(--bg3);border:1px solid var(--border);color:var(--text2);transition:all .3s}
+.pipeline .step.active{border-color:var(--accent);color:var(--accent);background:rgba(59,130,246,.1);box-shadow:0 0 12px rgba(59,130,246,.2)}
+.pipeline .step.done{border-color:var(--green);color:var(--green);background:rgba(34,197,94,.1)}
+.pipeline .step.fail{border-color:var(--red);color:var(--red);background:rgba(239,68,68,.1)}
+.pipeline .arrow{color:var(--text2);font-size:14px}
+
+/* Chart placeholder */
+.chart-area{height:200px;display:flex;align-items:flex-end;gap:3px;padding:10px 0}
+.chart-bar{background:linear-gradient(180deg,var(--accent),rgba(59,130,246,.3));border-radius:3px 3px 0 0;min-width:12px;transition:height .5s}
+
+/* Activity feed */
+.feed .item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid rgba(31,41,55,.3)}
+.feed .item:last-child{border:0}
+.feed .icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.feed .icon.pass{background:rgba(34,197,94,.15);color:var(--green)}
+.feed .icon.fail{background:rgba(239,68,68,.15);color:var(--red)}
+.feed .icon.info{background:rgba(59,130,246,.15);color:var(--accent)}
+.feed .meta{font-size:12px;color:var(--text2)}
+
+/* Memory bars */
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:13px}
+.bar-row .bar-label{width:120px;color:var(--text2)}
+.bar-row .bar-track{flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden}
+.bar-row .bar-fill{height:100%;border-radius:4px;transition:width .5s}
+.bar-row .bar-val{width:40px;text-align:right;font-size:12px;color:var(--text2)}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;margin-bottom:16px}
+.tabs button{padding:8px 16px;border:1px solid var(--border);background:transparent;color:var(--text2);border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit}
+.tabs button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* Empty state */
+.empty{text-align:center;padding:60px 20px;color:var(--text2)}
+.empty i{font-size:48px;margin-bottom:16px;color:var(--border)}
+.empty code{background:var(--bg3);padding:4px 10px;border-radius:6px;font-size:13px;color:var(--accent)}
+
+/* Settings */
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:12px;color:var(--text2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+.form-group input,.form-group select{width:100%;padding:10px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;font-family:inherit}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:var(--accent)}
+.btn{padding:10px 20px;border-radius:8px;border:none;cursor:pointer;font-size:14px;font-weight:600;font-family:inherit;transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#2563eb}
+.btn-danger{background:var(--red);color:#fff}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text2)}
+
+/* Responsive */
+@media(max-width:1024px){.stats{grid-template-columns:repeat(2,1fr)}.grid-2,.grid-3{grid-template-columns:1fr}}
+@media(max-width:768px){.sidebar{display:none}.header{left:0}.main{margin-left:0}}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="logo"><i class="ri-brain-line" style="color:var(--accent)"></i> <span>NEXUS</span></div>
+  <nav id="nav">
+    <a href="#/" class="active" data-page="dashboard"><i class="ri-dashboard-3-line"></i>Dashboard</a>
+    <a href="#/tasks" data-page="tasks"><i class="ri-list-check-2"></i>Tasks</a>
+    <a href="#/memory" data-page="memory"><i class="ri-database-2-line"></i>Memory</a>
+    <a href="#/analytics" data-page="analytics"><i class="ri-bar-chart-2-line"></i>Analytics</a>
+    <a href="#/settings" data-page="settings"><i class="ri-settings-3-line"></i>Settings</a>
+  </nav>
+  <div class="bottom">
+    <a href="https://github.com/Kaushalt2004/cognicore-my-openenv" target="_blank"><i class="ri-github-fill"></i> GitHub</a>
+    <br>v1.0.0
+  </div>
+</aside>
+
+<!-- Header -->
+<header class="header">
+  <div class="status">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">Connecting...</span>
+  </div>
+  <div class="right">
+    <span>Tokens: <strong id="hdrTokens">—</strong></span>
+    <span>Cost: <span class="cost" id="hdrCost">$0.00</span></span>
+  </div>
+</header>
+
+<!-- Main Content -->
+<main class="main" id="app"></main>
+
+<script>
+const API = window.location.origin + '/api';
+let ws = null, wsConnected = false, currentPage = 'dashboard';
+let statsCache = {}, tasksCache = [], memoryCache = {}, analyticsCache = {};
+
+// ── WebSocket ──
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(proto + '//' + location.host + '/ws/events');
+  ws.onopen = () => {
+    wsConnected = true;
+    document.getElementById('statusDot').className = 'dot live';
+    document.getElementById('statusText').textContent = 'Live';
+  };
+  ws.onclose = () => {
+    wsConnected = false;
+    document.getElementById('statusDot').className = 'dot';
+    document.getElementById('statusText').textContent = 'Offline';
+    setTimeout(connectWS, 3000);
+  };
+  ws.onmessage = (e) => {
+    try {
+      const evt = JSON.parse(e.data);
+      handleEvent(evt);
+    } catch(err) {}
+  };
+}
+
+function handleEvent(evt) {
+  // Update header stats on any event
+  fetchStats();
+  if (currentPage === 'dashboard') renderDashboard();
+  if (currentPage === 'tasks') renderTasks();
+}
+
+// ── API ──
+async function fetchJSON(url) {
+  try { const r = await fetch(url); return await r.json(); }
+  catch(e) { return null; }
+}
+
+async function fetchStats() {
+  const d = await fetchJSON(API + '/stats');
+  if (d) {
+    statsCache = d;
+    document.getElementById('hdrTokens').textContent = (d.total_tokens||0).toLocaleString();
+    document.getElementById('hdrCost').textContent = '$' + (d.total_cost||0).toFixed(4);
+  }
+}
+
+// ── Router ──
+function navigate(page) {
+  currentPage = page;
+  document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('active', a.dataset.page === page));
+  render();
+}
+
+window.addEventListener('hashchange', () => {
+  const h = location.hash.replace('#/', '') || 'dashboard';
+  navigate(h.split('/')[0]);
+});
+
+// ── Render ──
+function render() {
+  switch(currentPage) {
+    case 'dashboard': renderDashboard(); break;
+    case 'tasks': renderTasks(); break;
+    case 'memory': renderMemory(); break;
+    case 'analytics': renderAnalytics(); break;
+    case 'settings': renderSettings(); break;
+  }
+}
+
+// ── Dashboard ──
+async function renderDashboard() {
+  const d = statsCache.total_tasks != null ? statsCache : await fetchJSON(API+'/stats') || {};
+  const tasks = await fetchJSON(API+'/tasks?limit=10') || [];
+  statsCache = d;
+
+  const bars = tasks.slice(-20).map(t => {
+    const h = t.status==='solved' ? 60+Math.random()*80 : 15+Math.random()*30;
+    const c = t.status==='solved' ? 'var(--green)' : 'var(--red)';
+    return `<div class="chart-bar" style="height:${h}px;background:${c}" title="${t.id}"></div>`;
+  }).join('');
+
+  const feed = tasks.slice(-8).reverse().map(t => {
+    const ic = t.status==='solved' ? 'pass' : 'fail';
+    const icon = t.status==='solved' ? 'ri-check-line' : 'ri-close-line';
+    return `<div class="item"><div class="icon ${ic}"><i class="${icon}"></i></div><div><div>${t.id}</div><div class="meta">${t.policy} · ${t.tokens.toLocaleString()} tokens · ${t.category}</div></div></div>`;
+  }).join('');
+
+  document.getElementById('app').innerHTML = `
+    <div class="stats">
+      <div class="stat-card accent"><div class="label">Total Tasks</div><div class="value">${d.total_tasks||0}</div><div class="sub">${d.policies?.length||0} policies tested</div></div>
+      <div class="stat-card green"><div class="label">Solve Rate</div><div class="value">${d.solve_rate||0}%</div><div class="sub">${d.solved||0} solved</div></div>
+      <div class="stat-card yellow"><div class="label">Tokens Used</div><div class="value">${(d.total_tokens||0).toLocaleString()}</div><div class="sub">$${(d.total_cost||0).toFixed(4)} total cost</div></div>
+      <div class="stat-card purple"><div class="label">Memory</div><div class="value">${d.memory_entries||0}</div><div class="sub">${d.active_connections||0} live connections</div></div>
+    </div>
+    <div class="grid-3">
+      <div class="panel"><h3><i class="ri-line-chart-line"></i>Task Results</h3><div class="chart-area">${bars}</div></div>
+      <div class="panel"><h3><i class="ri-time-line"></i>Recent Activity</h3><div class="feed">${feed||'<div class="empty"><i class="ri-inbox-line"></i><p>No tasks yet</p><p><code>python -m cognicore.nexus.run</code></p></div>'}</div></div>
+    </div>`;
+}
+
+// ── Tasks ──
+async function renderTasks() {
+  const tasks = await fetchJSON(API+'/tasks?limit=200') || [];
+  tasksCache = tasks;
+  const rows = tasks.reverse().map(t => `
+    <tr onclick="location.hash='#/task/${t.id}'">
+      <td><strong>${t.id}</strong></td><td>${t.repo}</td><td>${t.category}</td>
+      <td><span class="badge ${t.status}">${t.status}</span></td>
+      <td>${t.policy}</td><td>${t.tokens.toLocaleString()}</td>
+      <td>$${t.cost.toFixed(4)}</td><td>${t.reward}</td>
+    </tr>`).join('');
+
+  document.getElementById('app').innerHTML = `
+    <div class="panel">
+      <h3><i class="ri-list-check-2"></i>Task Queue (${tasks.length})</h3>
+      <table><thead><tr><th>Task ID</th><th>Repo</th><th>Category</th><th>Status</th><th>Policy</th><th>Tokens</th><th>Cost</th><th>Reward</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan=8 class="empty">No tasks</td></tr>'}</tbody></table>
+    </div>`;
+}
+
+// ── Memory ──
+async function renderMemory() {
+  const m = await fetchJSON(API+'/memory') || {};
+  const g = m.global || {};
+  const succ = g.successful_tactics || {};
+  const fail = g.failed_tactics || {};
+  const maxVal = Math.max(...Object.values(succ), ...Object.values(fail), 1);
+
+  const succBars = Object.entries(succ).map(([k,v]) => `
+    <div class="bar-row"><span class="bar-label">${k}</span><div class="bar-track"><div class="bar-fill" style="width:${v/maxVal*100}%;background:var(--green)"></div></div><span class="bar-val">${v}</span></div>`).join('');
+  const failBars = Object.entries(fail).map(([k,v]) => `
+    <div class="bar-row"><span class="bar-label">${k}</span><div class="bar-track"><div class="bar-fill" style="width:${v/maxVal*100}%;background:var(--red)"></div></div><span class="bar-val">${v}</span></div>`).join('');
+
+  const cats = Object.entries(m.categories||{}).map(([cat,data]) => {
+    const s = Object.values(data.successful_tactics||{}).reduce((a,b)=>a+b,0);
+    const f = Object.values(data.failed_tactics||{}).reduce((a,b)=>a+b,0);
+    const rate = s+f>0 ? Math.round(s/(s+f)*100) : 0;
+    return `<tr><td>${cat}</td><td>${s+f}</td><td>${s}</td><td>${f}</td><td>${rate}%</td></tr>`;
+  }).join('');
+
+  document.getElementById('app').innerHTML = `
+    <div class="stats"><div class="stat-card accent"><div class="label">Total Memories</div><div class="value">${m.total_entries||0}</div></div>
+    <div class="stat-card green"><div class="label">Successful Tactics</div><div class="value">${Object.keys(succ).length}</div></div>
+    <div class="stat-card red"><div class="label">Failed Tactics</div><div class="value">${Object.keys(fail).length}</div></div>
+    <div class="stat-card purple"><div class="label">Categories</div><div class="value">${Object.keys(m.categories||{}).length}</div></div></div>
+    <div class="grid-2">
+      <div class="panel"><h3><i class="ri-check-double-line" style="color:var(--green)"></i>Successful Tactics</h3>${succBars||'None yet'}</div>
+      <div class="panel"><h3><i class="ri-close-circle-line" style="color:var(--red)"></i>Failed Tactics</h3>${failBars||'None yet'}</div>
+    </div>
+    <div class="panel"><h3><i class="ri-folder-chart-line"></i>Category Breakdown</h3>
+      <table><thead><tr><th>Category</th><th>Total</th><th>Success</th><th>Failed</th><th>Rate</th></tr></thead><tbody>${cats}</tbody></table>
+    </div>`;
+}
+
+// ── Analytics ──
+async function renderAnalytics() {
+  const a = await fetchJSON(API+'/analytics') || {};
+  const policies = a.policies || [];
+  const categories = a.categories || [];
+  const maxSolve = Math.max(...policies.map(p=>p.solve_rate),1);
+
+  const policyBars = policies.map(p => `
+    <div class="bar-row"><span class="bar-label">${p.policy}</span>
+    <div class="bar-track"><div class="bar-fill" style="width:${p.solve_rate/maxSolve*100}%;background:linear-gradient(90deg,var(--accent),var(--purple))"></div></div>
+    <span class="bar-val">${p.solve_rate}%</span></div>`).join('');
+
+  const policyTable = policies.map(p => `
+    <tr><td><strong>${p.policy}</strong></td><td>${p.n}</td><td>${p.solved}</td>
+    <td>${p.solve_rate}%</td><td>${p.avg_tokens.toLocaleString()}</td><td>${p.mean_reward}</td></tr>`).join('');
+
+  const catRows = categories.map(c => {
+    const rate = c.total>0 ? Math.round(c.solved/c.total*100) : 0;
+    return `<tr><td>${c.category}</td><td>${c.total}</td><td>${c.solved}</td><td>${rate}%</td><td>${c.tokens.toLocaleString()}</td></tr>`;
+  }).join('');
+
+  document.getElementById('app').innerHTML = `
+    <div class="panel"><h3><i class="ri-bar-chart-grouped-line"></i>Policy Comparison</h3>${policyBars}
+    <table style="margin-top:16px"><thead><tr><th>Policy</th><th>N</th><th>Solved</th><th>Rate</th><th>Avg Tokens</th><th>Reward</th></tr></thead><tbody>${policyTable}</tbody></table></div>
+    <div class="panel"><h3><i class="ri-grid-line"></i>Category Heatmap</h3>
+    <table><thead><tr><th>Category</th><th>Total</th><th>Solved</th><th>Rate</th><th>Tokens</th></tr></thead><tbody>${catRows}</tbody></table></div>`;
+}
+
+// ── Settings ──
+async function renderSettings() {
+  const s = await fetchJSON(API+'/settings') || {};
+  document.getElementById('app').innerHTML = `
+    <div class="grid-2">
+      <div class="panel"><h3><i class="ri-key-2-line"></i>API Keys</h3>
+        <div class="form-group"><label>Gemini</label><input value="${s.gemini_key||''}" placeholder="Set GEMINI_API_KEY env var" disabled></div>
+        <div class="form-group"><label>OpenAI</label><input value="${s.openai_key||''}" placeholder="Set OPENAI_API_KEY env var" disabled></div>
+        <div class="form-group"><label>Anthropic</label><input value="${s.anthropic_key||''}" placeholder="Set ANTHROPIC_API_KEY env var" disabled></div>
+      </div>
+      <div class="panel"><h3><i class="ri-settings-3-line"></i>Configuration</h3>
+        <div class="form-group"><label>Default Policy</label><select id="sPolicy"><option ${s.default_policy==='minimal'?'selected':''}>minimal</option><option ${s.default_policy==='test_first'?'selected':''}>test_first</option><option ${s.default_policy==='standard'?'selected':''}>standard</option><option ${s.default_policy==='review_first'?'selected':''}>review_first</option></select></div>
+        <div class="form-group"><label>Max Tokens</label><input id="sTokens" type="number" value="${s.max_tokens||1000000}"></div>
+        <div class="form-group"><label>Budget (USD)</label><input id="sBudget" type="number" step="0.01" value="${s.budget_usd||50}"></div>
+        <div class="form-group"><label>Port</label><input id="sPort" type="number" value="${s.port||7842}"></div>
+        <button class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+      </div>
+    </div>
+    <div class="panel" style="border-color:var(--red)"><h3 style="color:var(--red)"><i class="ri-error-warning-line"></i>Danger Zone</h3>
+      <button class="btn btn-danger" onclick="if(confirm('Clear all memory?'))fetch(API+'/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({clear_memory:true})})">Clear Memory</button>
+      <button class="btn btn-ghost" style="margin-left:8px" onclick="exportData()">Export All Data</button>
+    </div>`;
+}
+
+async function saveSettings() {
+  await fetch(API+'/settings', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({default_policy:document.getElementById('sPolicy').value,
+      max_tokens:+document.getElementById('sTokens').value,
+      budget_usd:+document.getElementById('sBudget').value,
+      port:+document.getElementById('sPort').value})});
+  alert('Settings saved');
+}
+
+function exportData() {
+  window.open(API+'/tasks?limit=10000');
+}
+
+// ── Init ──
+connectWS();
+fetchStats();
+navigate('dashboard');
+setInterval(fetchStats, 10000);
+</script>
+</body>
+</html>
