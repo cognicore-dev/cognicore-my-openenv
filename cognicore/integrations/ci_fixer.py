@@ -132,12 +132,12 @@ class CIFailureFixer:
             return "import_error"
         elif "typeerror" in error_text:
             return "type_error"
-        elif "assertionerror" in error_text or "failed" in error_text:
-            return "test_failure"
         elif "syntaxerror" in error_text:
             return "syntax_error"
         elif "lint" in error_text or "flake8" in error_text or "ruff" in error_text:
             return "lint_failure"
         elif "build" in error_text or "compile" in error_text:
             return "build_failure"
+        elif "assertionerror" in error_text or "failed" in error_text:
+            return "test_failure"
         return "unknown"

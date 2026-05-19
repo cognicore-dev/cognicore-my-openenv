@@ -73,6 +73,7 @@ class NexusTaskQueue:
         self.max_concurrent = max_concurrent
         self._lock = threading.Lock()
         self._callbacks: Dict[str, List[Callable]] = {}
+        self._persistent_conn = None
         self._init_db()
 
     def _init_db(self):
@@ -107,12 +108,22 @@ class NexusTaskQueue:
             CREATE INDEX IF NOT EXISTS idx_priority ON tasks(priority);
             CREATE INDEX IF NOT EXISTS idx_source ON tasks(source);
         """)
-        db.close()
+        if self.db_path != ":memory:":
+            db.close()
 
     def _conn(self):
+        if self.db_path == ":memory:":
+            if self._persistent_conn is None:
+                self._persistent_conn = sqlite3.connect(":memory:")
+                self._persistent_conn.row_factory = sqlite3.Row
+            return self._persistent_conn
         db = sqlite3.connect(self.db_path)
         db.row_factory = sqlite3.Row
         return db
+
+    def _close(self, db):
+        if self.db_path != ":memory:":
+            db.close()
 
     def submit(self, task: NexusTask) -> str:
         """Submit a task to the queue. Returns task ID."""
@@ -123,7 +134,7 @@ class NexusTaskQueue:
                 "SELECT id FROM tasks WHERE repo=? AND title=? AND status IN ('pending','running')",
                 (task.repo, task.title)).fetchone()
             if existing:
-                db.close()
+                self._close(db)
                 return existing["id"]  # already queued
 
             db.execute("""INSERT INTO tasks
@@ -135,7 +146,7 @@ class NexusTaskQueue:
                  task.budget_usd, task.callback_url, json.dumps(task.metadata),
                  task.created_at))
             db.commit()
-            db.close()
+            self._close(db)
             self._fire("task_submitted", task)
             return task.id
 
@@ -147,21 +158,21 @@ class NexusTaskQueue:
             running = db.execute(
                 "SELECT COUNT(*) as c FROM tasks WHERE status='running'").fetchone()["c"]
             if running >= self.max_concurrent:
-                db.close()
+                self._close(db)
                 return None
 
             row = db.execute(
                 "SELECT * FROM tasks WHERE status='pending' ORDER BY priority ASC, created_at ASC LIMIT 1"
             ).fetchone()
             if not row:
-                db.close()
+                self._close(db)
                 return None
 
             task = self._row_to_task(row)
             db.execute("UPDATE tasks SET status='running', started_at=? WHERE id=?",
                       (datetime.utcnow().isoformat(), task.id))
             db.commit()
-            db.close()
+            self._close(db)
             task.status = "running"
             self._fire("task_started", task)
             return task
@@ -190,7 +201,7 @@ class NexusTaskQueue:
                               (task.attempts, task_id))
 
             db.commit()
-            db.close()
+            self._close(db)
             task = self._row_to_task(row) if row else NexusTask(id=task_id)
             task.status = status
             self._fire("task_completed", task)
@@ -208,7 +219,7 @@ class NexusTaskQueue:
         q += " ORDER BY created_at DESC LIMIT ?"
         params.append(limit)
         rows = db.execute(q, params).fetchall()
-        db.close()
+        self._close(db)
         return [dict(r) for r in rows]
 
     def stats(self) -> dict:
@@ -221,13 +232,13 @@ class NexusTaskQueue:
         for row in db.execute("SELECT source, COUNT(*) as c FROM tasks GROUP BY source"):
             by_source[row["source"]] = row["c"]
         dead = db.execute("SELECT COUNT(*) as c FROM dead_letter").fetchone()["c"]
-        db.close()
+        self._close(db)
         return {"total": total, "by_status": by_status, "by_source": by_source, "dead_letter": dead}
 
     def dead_letter_queue(self) -> List[dict]:
         db = self._conn()
         rows = db.execute("SELECT * FROM dead_letter ORDER BY died_at DESC").fetchall()
-        db.close()
+        self._close(db)
         return [dict(r) for r in rows]
 
     def clear(self, status=None):
@@ -238,7 +249,7 @@ class NexusTaskQueue:
             db.execute("DELETE FROM tasks")
             db.execute("DELETE FROM dead_letter")
         db.commit()
-        db.close()
+        self._close(db)
 
     def on(self, event: str, callback: Callable):
         self._callbacks.setdefault(event, []).append(callback)
