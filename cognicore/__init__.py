@@ -114,7 +114,8 @@ from cognicore.evolution import EvolutionEngine
 # Platform features
 from cognicore.persistence import save_agent, load_agent
 from cognicore.report import ReportGenerator
-from cognicore.replay import SessionRecorder, replay
+from cognicore.replay import EventRecorder, TaskReplayer, TaskBrancher, RLNavigator
+from cognicore.immune import NexusShield, RLDefender
 from cognicore.profiles import get_profile, list_profiles
 from cognicore.prompt_optimizer import PromptOptimizer
 from cognicore.webhooks import AlertSystem
@@ -211,8 +212,12 @@ __all__ = [
     "save_agent",
     "load_agent",
     "ReportGenerator",
-    "SessionRecorder",
-    "replay",
+    "EventRecorder",
+    "TaskReplayer",
+    "TaskBrancher",
+    "RLNavigator",
+    "NexusShield",
+    "RLDefender",
     "get_profile",
     "list_profiles",
     "PromptOptimizer",
