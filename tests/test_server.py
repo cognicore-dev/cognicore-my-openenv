@@ -1,4 +1,4 @@
-"""Tests for CogniCore REST API Server."""
+﻿"""Tests for CogniCore REST API Server."""
 
 import pytest
 
@@ -32,7 +32,7 @@ class TestServerRoot:
         resp = client.get("/envs")
         assert resp.status_code == 200
         envs = resp.json()["environments"]
-        assert len(envs) == 50
+        assert len(envs) >= 50  # grows as new environments are added
         ids = [e["id"] for e in envs]
         assert "SafetyClassification-v1" in ids
         assert "MathReasoning-v1" in ids

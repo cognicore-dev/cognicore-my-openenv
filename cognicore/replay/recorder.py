@@ -169,7 +169,12 @@ class EventRecorder:
         try:
             self._queue.put_nowait(event)
         except queue.Full:
-            pass  # Drop under extreme load
+            # Fallback: synchronous save if queue is full
+            if self._store:
+                try:
+                    self._store.save_event(event)
+                except Exception:
+                    pass
 
     def record_simple(self, task_id: str, event_type: str,
                      agent: str = "", input_text: str = "",
@@ -191,6 +196,13 @@ class EventRecorder:
             policy=policy, confidence=confidence,
             branch_id=branch_id, state_vector=state_vector)
         self.record(event)
+        # Also do a synchronous save to ensure the event is
+        # persisted immediately (not stuck in the async queue)
+        if self._store:
+            try:
+                self._store.save_event(event)
+            except Exception:
+                pass
         return event
 
     def checkpoint(self, task_id: str, label: str = "") -> str:
@@ -219,6 +231,21 @@ class EventRecorder:
         self._callbacks.append(callback)
 
     def stop(self):
+        self.flush()
         self._running = False
         if self._worker:
             self._worker.join(timeout=2)
+
+    def flush(self):
+        """Drain any remaining queued events to the store synchronously."""
+        if not self._store:
+            return
+        while True:
+            try:
+                event = self._queue.get_nowait()
+                try:
+                    self._store.save_event(event)
+                except Exception:
+                    pass
+            except queue.Empty:
+                break

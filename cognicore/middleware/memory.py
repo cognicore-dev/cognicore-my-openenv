@@ -81,25 +81,35 @@ class Memory:
     ) -> List[Dict[str, Any]]:
         """Retrieve the most recent entries sharing the same group value.
 
+        Checks both the configured ``similarity_key`` and common aliases
+        (``category``, ``group``, ``type``) so entries are found regardless
+        of which key the caller used when storing.
+
         Parameters
         ----------
         group_value : str
-            Value of the ``similarity_key`` to match.
+            Value to match.
         top_k : int
             Maximum number of results (most recent first).
         """
         self._stats["total_retrieved"] += 1
-        similar = [e for e in self.entries if e.get(self.similarity_key) == group_value]
+        # Check primary key and common aliases
+        keys_to_check = {self.similarity_key, "category", "group", "type"}
+        similar = [
+            e for e in self.entries
+            if any(e.get(k) == group_value for k in keys_to_check)
+        ]
         return similar[-top_k:][::-1]
 
     def retrieve_successes(
         self, group_value: str, top_k: int = 3
     ) -> List[Dict[str, Any]]:
         """Retrieve successful (correct=True) entries in a group."""
+        keys_to_check = {self.similarity_key, "category", "group", "type"}
         successes = [
             e
             for e in self.entries
-            if e.get(self.similarity_key) == group_value and e.get("correct")
+            if any(e.get(k) == group_value for k in keys_to_check) and e.get("correct")
         ]
         return successes[-top_k:][::-1]
 
@@ -107,10 +117,11 @@ class Memory:
         self, group_value: str, top_k: int = 3
     ) -> List[Dict[str, Any]]:
         """Retrieve failed (correct=False) entries in a group."""
+        keys_to_check = {self.similarity_key, "category", "group", "type"}
         failures = [
             e
             for e in self.entries
-            if e.get(self.similarity_key) == group_value and not e.get("correct")
+            if any(e.get(k) == group_value for k in keys_to_check) and not e.get("correct")
         ]
         return failures[-top_k:][::-1]
 
@@ -133,7 +144,11 @@ class Memory:
 
     def has_seen_group(self, group_value: str) -> bool:
         """Return True if memory has any entries for this group."""
-        return any(e.get(self.similarity_key) == group_value for e in self.entries)
+        keys_to_check = {self.similarity_key, "category", "group", "type"}
+        return any(
+            any(e.get(k) == group_value for k in keys_to_check)
+            for e in self.entries
+        )
 
     # ------------------------------------------------------------------
     # Persistence
