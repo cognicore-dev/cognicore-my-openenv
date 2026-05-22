@@ -1,7 +1,7 @@
 [project]
 name = "cognicore-env"
-version = "0.8.0"
-description = "Cognitive RL environments — Memory, Reflection & Reward Shaping built into every env. SB3/Gymnasium compatible."
+version = "0.8.1"
+description = "Cognitive RL environments with Memory, Reflection and Reward Shaping. SB3/Gymnasium compatible."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.9"
@@ -67,4 +67,3 @@ extend-ignore = ["E501"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-
