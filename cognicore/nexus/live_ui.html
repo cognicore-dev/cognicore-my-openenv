@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEXUS — Full Runtime Observability</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a0b;--bg2:#111113;--bg3:#1a1a1e;--bg4:#222228;--border:#2a2a30;--text:#eee;--text2:#999;--text3:#555;--green:#4ade80;--red:#f87171;--blue:#60a5fa;--amber:#fbbf24;--violet:#a78bfa;--cyan:#22d3ee;--rose:#fb7185;--mono:'JetBrains Mono',monospace;--sans:'Inter',sans-serif}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden}
+
+.app{height:100vh;display:flex;flex-direction:column}
+
+/* Top bar */
+.topbar{height:42px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0}
+.topbar .logo{font-family:var(--mono);font-weight:700;font-size:.95rem;background:linear-gradient(135deg,var(--blue),var(--violet));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.topbar .ver{font-size:.65rem;color:var(--text3);font-family:var(--mono)}
+.conn{margin-left:auto;display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.7rem}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--text3)}
+.dot.on{background:var(--green);box-shadow:0 0 6px var(--green)}
+.subsys{display:flex;gap:4px;margin-left:8px}
+.subsys .chip{font-size:.6rem;padding:2px 6px;border-radius:3px;font-family:var(--mono);background:var(--bg3);color:var(--text3);border:1px solid var(--border)}
+.subsys .chip.active{color:var(--green);border-color:rgba(74,222,128,.3);background:rgba(74,222,128,.06)}
+.subsys .chip.inactive{color:var(--red);border-color:rgba(248,113,113,.2)}
+
+/* Toolbar */
+.toolbar{height:44px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:8px;flex-shrink:0}
+.toolbar input{flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:.8rem;padding:7px 14px;border-radius:5px;outline:none}
+.toolbar input:focus{border-color:var(--blue)}
+.toolbar select{background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:.75rem;padding:7px 10px;border-radius:5px;outline:none}
+.toolbar button{font-family:var(--mono);font-weight:600;font-size:.75rem;padding:7px 16px;border:none;border-radius:5px;cursor:pointer;white-space:nowrap}
+.btn-run{background:#fff;color:#000}.btn-run:hover{background:#ddd}.btn-run:disabled{opacity:.3;cursor:not-allowed}
+.btn-scan{background:var(--rose);color:#fff}.btn-scan:hover{background:#e11d48}
+
+/* Tabs */
+.tabs{height:32px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;padding:0 16px;gap:0;flex-shrink:0}
+.tab{padding:0 16px;font-family:var(--mono);font-size:.7rem;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;display:flex;align-items:center;gap:5px;transition:.2s}
+.tab:hover{color:var(--text2)}.tab.active{color:var(--text);border-color:var(--blue)}
+.tab .cnt{font-size:.6rem;background:var(--bg3);padding:1px 5px;border-radius:3px;color:var(--text3)}
+
+/* Main area */
+.main{flex:1;display:flex;overflow:hidden}
+.panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.panel.hidden{display:none}
+
+/* Terminal */
+.terminal{flex:1;padding:12px 16px;overflow-y:auto;font-family:var(--mono);font-size:.78rem;line-height:1.65}
+.terminal::-webkit-scrollbar{width:5px}.terminal::-webkit-scrollbar-thumb{background:var(--border)}
+.log{margin-bottom:1px;display:flex;gap:6px;align-items:flex-start;padding:2px 4px;border-radius:3px}
+.log:hover{background:var(--bg3)}
+.log-ts{color:var(--text3);font-size:.68rem;flex-shrink:0;width:62px}
+.log-agent{font-size:.62rem;font-weight:600;width:70px;flex-shrink:0;text-transform:uppercase;padding:1px 4px;border-radius:2px;text-align:center}
+.log-phase{font-weight:600;width:55px;flex-shrink:0;text-transform:uppercase;font-size:.68rem}
+.log-msg{flex:1;word-break:break-word;color:#ccc}
+.log-msg .dim{color:var(--text3)}
+.status-failed .log-msg{color:var(--red)}
+.status-blocked .log-msg{color:var(--rose)}
+
+/* Agent colors */
+.a-immune_shield{background:rgba(251,113,133,.15);color:var(--rose)}
+.a-nexus_runner{background:rgba(96,165,250,.12);color:var(--blue)}
+.a-localizer{background:rgba(251,191,36,.12);color:var(--amber)}
+.a-coder{background:rgba(74,222,128,.12);color:var(--green)}
+.a-tester{background:rgba(167,139,250,.12);color:var(--violet)}
+.a-patcher{background:rgba(34,211,238,.12);color:var(--cyan)}
+.a-reader{background:rgba(148,163,184,.12);color:#94a3b8}
+.a-memory,.a-persistent_cognition,.a-episodic_memory{background:rgba(167,139,250,.12);color:var(--violet)}
+.a-safety_monitor{background:rgba(251,191,36,.12);color:var(--amber)}
+.a-reflection_engine{background:rgba(34,211,238,.12);color:var(--cyan)}
+.a-workspace{background:rgba(148,163,184,.12);color:#94a3b8}
+.a-github{background:rgba(96,165,250,.12);color:var(--blue)}
+.a-brancher{background:rgba(251,191,36,.12);color:var(--amber)}
+.a-planner{background:rgba(96,165,250,.12);color:var(--blue)}
+
+.ph-setup{color:var(--cyan)}.ph-search{color:var(--amber)}.ph-read{color:var(--text2)}
+.ph-memory{color:var(--violet)}.ph-plan,.ph-llm{color:var(--blue)}
+.ph-patch,.ph-apply{color:var(--green)}.ph-test{color:var(--amber)}
+.ph-immune{color:var(--rose)}.ph-done{color:var(--green)}.ph-error{color:var(--red)}
+.ph-replay{color:var(--cyan)}.ph-reflection{color:var(--cyan)}.ph-safety{color:var(--amber)}
+.ph-system{color:var(--text3)}
+
+/* Sidebar */
+.sidebar{width:360px;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
+.sidebar::-webkit-scrollbar{width:4px}.sidebar::-webkit-scrollbar-thumb{background:var(--border)}
+.sec{padding:14px 16px;border-bottom:1px solid var(--border)}
+.sec h3{font-size:.68rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;font-family:var(--sans);font-weight:600;display:flex;align-items:center;gap:6px}
+.sec h3 .ico{width:3px;height:10px;border-radius:1px}
+.ico-blue{background:var(--blue)}.ico-green{background:var(--green)}.ico-amber{background:var(--amber)}.ico-violet{background:var(--violet)}.ico-rose{background:var(--rose)}.ico-cyan{background:var(--cyan)}
+
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px}
+.stat .v{font-family:var(--mono);font-size:1.2rem;font-weight:600;color:#fff}
+.stat .l{font-size:.65rem;color:var(--text2);margin-top:3px}
+
+/* Immune panel */
+.threat-result{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;font-family:var(--mono);font-size:.75rem;margin-top:8px}
+.threat-result .allowed{color:var(--green)}.threat-result .blocked{color:var(--red)}
+
+/* Timeline */
+.tl{display:flex;flex-direction:column;gap:4px}
+.tl-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;font-family:var(--mono);font-size:.72rem;cursor:pointer}
+.tl-item:hover{background:var(--bg3)}
+.tl-item.done .ico2{color:var(--green)}.tl-item.failed .ico2{color:var(--red)}
+.tl-item.running .ico2{color:var(--blue)}
+.ico2{width:14px;text-align:center;flex-shrink:0}
+.tl-label{flex:1;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tl-meta{font-size:.6rem;color:var(--text3)}
+
+/* Detail */
+.detail-box{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-family:var(--mono);font-size:.72rem;line-height:1.5;max-height:250px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;color:#bbb}
+.detail-box::-webkit-scrollbar{width:4px}.detail-box::-webkit-scrollbar-thumb{background:var(--border)}
+
+/* Test panel */
+.test-bar{height:0;background:var(--bg2);border-top:1px solid var(--border);transition:height .3s;overflow:hidden;flex-shrink:0}
+.test-bar.show{height:150px}
+.test-bar-head{height:28px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px}
+.test-bar-head span{font-family:var(--mono);font-size:.65rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px}
+.test-out{padding:8px 16px;font-family:var(--mono);font-size:.75rem;line-height:1.5;overflow-y:auto;height:calc(100% - 28px);color:#bbb;white-space:pre-wrap}
+
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text3);font-family:var(--mono);font-size:.8rem;gap:6px}
+.empty .big{font-size:1rem;color:var(--text2)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <span class="logo">NEXUS</span>
+    <span class="ver">v1.0 Full Runtime</span>
+    <div class="subsys" id="subsysChips"></div>
+    <div class="conn"><div class="dot" id="dot"></div><span id="connTxt" style="color:var(--text3)">...</span></div>
+  </div>
+
+  <div class="toolbar">
+    <input type="text" id="taskIn" placeholder="Enter task: Fix detect_encoding crash when content is None" />
+    <select id="repoSel"><option value=".">Project root</option><option value="">Current dir</option></select>
+    <button class="btn-run" id="runBtn" onclick="submitTask()" disabled>RUN</button>
+    <button class="btn-scan" onclick="scanThreat()">IMMUNE SCAN</button>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('runtime')" id="tabRuntime">Runtime <span class="cnt" id="cntEvents">0</span></div>
+    <div class="tab" onclick="switchTab('immune')" id="tabImmune">Immune</div>
+    <div class="tab" onclick="switchTab('memory')" id="tabMemory">Memory</div>
+    <div class="tab" onclick="switchTab('replay')" id="tabReplay">Replay</div>
+    <div class="tab" onclick="switchTab('agents')" id="tabAgents">Agents</div>
+  </div>
+
+  <div class="main">
+    <!-- Runtime panel -->
+    <div class="panel" id="panelRuntime">
+      <div class="terminal" id="term">
+        <div class="empty" id="emptyState"><div class="big">NEXUS Runtime Ready</div><div>All subsystems instrumented. Enter a task and click RUN.</div></div>
+      </div>
+    </div>
+
+    <!-- Immune panel -->
+    <div class="panel hidden" id="panelImmune">
+      <div class="terminal" id="immuneLog" style="padding:20px">
+        <div style="margin-bottom:16px">
+          <h3 style="font-family:var(--mono);font-size:.85rem;color:var(--rose);margin-bottom:12px">NexusShield - Immune System</h3>
+          <div class="stats" style="margin-bottom:16px">
+            <div class="stat"><div class="v" id="imTotal">0</div><div class="l">Total Scans</div></div>
+            <div class="stat"><div class="v" id="imBlocked" style="color:var(--red)">0</div><div class="l">Blocked</div></div>
+            <div class="stat"><div class="v" id="imRate">0%</div><div class="l">Block Rate</div></div>
+            <div class="stat"><div class="v" id="imAntibodies">0</div><div class="l">Antibodies</div></div>
+          </div>
+          <div style="font-size:.75rem;color:var(--text2);margin-bottom:8px">Live Threat Scanner</div>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <input type="text" id="scanIn" placeholder="Paste text to scan..." style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text);font-family:var(--mono);font-size:.8rem;padding:8px;border-radius:5px;outline:none" />
+            <button class="btn-scan" onclick="scanThreat()">SCAN</button>
+          </div>
+          <div id="scanResult"></div>
+        </div>
+        <div style="font-size:.75rem;color:var(--text2);margin-bottom:8px">Immune Event Log</div>
+        <div id="immuneEvents" style="font-family:var(--mono);font-size:.75rem"></div>
+      </div>
+    </div>
+
+    <!-- Memory panel -->
+    <div class="panel hidden" id="panelMemory">
+      <div class="terminal" style="padding:20px">
+        <h3 style="font-family:var(--mono);font-size:.85rem;color:var(--violet);margin-bottom:12px">Cognitive Memory Systems</h3>
+        <div class="stats" style="margin-bottom:16px">
+          <div class="stat"><div class="v" id="memEntries">0</div><div class="l">Episodes</div></div>
+          <div class="stat"><div class="v" id="memSuccess">0%</div><div class="l">Success Rate</div></div>
+          <div class="stat"><div class="v" id="memGroups">0</div><div class="l">Categories</div></div>
+          <div class="stat"><div class="v" id="memRetrieved">0</div><div class="l">Retrievals</div></div>
+        </div>
+        <div style="font-size:.75rem;color:var(--text2);margin-bottom:8px">Memory Events</div>
+        <div id="memoryEvents" style="font-family:var(--mono);font-size:.75rem"></div>
+      </div>
+    </div>
+
+    <!-- Replay panel -->
+    <div class="panel hidden" id="panelReplay">
+      <div class="terminal" style="padding:20px">
+        <h3 style="font-family:var(--mono);font-size:.85rem;color:var(--cyan);margin-bottom:12px">Replay & Branching</h3>
+        <div class="stats" style="margin-bottom:16px">
+          <div class="stat"><div class="v" id="rpEvents">0</div><div class="l">Stored Events</div></div>
+          <div class="stat"><div class="v" id="rpBranches">0</div><div class="l">Branches</div></div>
+        </div>
+        <div style="font-size:.75rem;color:var(--text2);margin-bottom:8px">Branch History</div>
+        <div id="branchList" style="font-family:var(--mono);font-size:.75rem"></div>
+        <div style="font-size:.75rem;color:var(--text2);margin:12px 0 8px">Replay Timeline</div>
+        <div id="replayTimeline" style="font-family:var(--mono);font-size:.75rem"></div>
+      </div>
+    </div>
+
+    <!-- Agents panel -->
+    <div class="panel hidden" id="panelAgents">
+      <div class="terminal" style="padding:20px">
+        <h3 style="font-family:var(--mono);font-size:.85rem;color:var(--blue);margin-bottom:12px">Multi-Agent Orchestration</h3>
+        <div id="agentFlow" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px"></div>
+        <div style="font-size:.75rem;color:var(--text2);margin-bottom:8px">Agent Activity Log</div>
+        <div id="agentLog" style="font-family:var(--mono);font-size:.75rem"></div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sec">
+        <h3><span class="ico ico-blue"></span>Metrics</h3>
+        <div class="stats">
+          <div class="stat"><div class="v" id="sTokens">0</div><div class="l">Tokens</div></div>
+          <div class="stat"><div class="v" id="sCost">$0.00</div><div class="l">Cost</div></div>
+          <div class="stat"><div class="v" id="sTests">--</div><div class="l">Tests</div></div>
+          <div class="stat"><div class="v" id="sTime">0s</div><div class="l">Duration</div></div>
+        </div>
+      </div>
+      <div class="sec">
+        <h3><span class="ico ico-green"></span>Execution Timeline</h3>
+        <div class="tl" id="timeline"></div>
+      </div>
+      <div class="sec" style="flex:1;display:flex;flex-direction:column;min-height:0">
+        <h3><span class="ico ico-amber"></span><span id="detailTitle">Event Detail</span></h3>
+        <div class="detail-box" id="detailBox"><span style="color:var(--text3)">Click a timeline event...</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="test-bar" id="testBar">
+    <div class="test-bar-head"><span>Test Output (Real)</span></div>
+    <div class="test-out" id="testOut"></div>
+  </div>
+</div>
+
+<script>
+let ws=null,eventCount=0,totalTokens=0,totalCost=0,taskStart=0,timer=null,running=false;
+const term=document.getElementById('term'),tl=document.getElementById('timeline');
+const agentsSeen=new Set();
+
+function connect(){
+  const p=location.protocol==='https:'?'wss':'ws';
+  ws=new WebSocket(p+'://'+location.host+'/ws');
+  ws.onopen=()=>{
+    document.getElementById('dot').className='dot on';
+    document.getElementById('connTxt').textContent='Connected';
+    document.getElementById('connTxt').style.color='var(--green)';
+    document.getElementById('runBtn').disabled=false;
+  };
+  ws.onclose=()=>{
+    document.getElementById('dot').className='dot';
+    document.getElementById('connTxt').textContent='Disconnected';
+    document.getElementById('connTxt').style.color='var(--red)';
+    document.getElementById('runBtn').disabled=true;
+    setTimeout(connect,3000);
+  };
+  ws.onerror=()=>{};
+  ws.onmessage=(m)=>{try{handleEvent(JSON.parse(m.data))}catch(e){}};
+}
+
+function handleEvent(e){
+  const es=document.getElementById('emptyState');if(es)es.remove();
+  eventCount++;
+  document.getElementById('cntEvents').textContent=eventCount;
+
+  // Subsystem chips on connect
+  if(e.phase==='system'&&e.action==='connected'){
+    try{
+      const sys=JSON.parse(e.detail);
+      const chips=document.getElementById('subsysChips');
+      chips.innerHTML='';
+      for(const[k,v]of Object.entries(sys)){
+        const c=document.createElement('span');
+        c.className='chip '+(v?'active':'inactive');
+        c.textContent=k.replace('_',' ');
+        chips.appendChild(c);
+      }
+    }catch(ex){}
+    return;
+  }
+
+  // Metrics
+  if(e.tokens_in||e.tokens_out){totalTokens+=(e.tokens_in||0)+(e.tokens_out||0);document.getElementById('sTokens').textContent=totalTokens.toLocaleString()}
+  if(e.cost){totalCost+=e.cost;document.getElementById('sCost').textContent='$'+totalCost.toFixed(4)}
+
+  // Tests
+  if(e.phase==='test'&&e.action){
+    const m2=e.action.match(/(\d+)P\/(\d+)F/);
+    if(m2){document.getElementById('sTests').textContent=m2[1]+'P/'+m2[2]+'F';document.getElementById('sTests').style.color=parseInt(m2[2])===0?'var(--green)':'var(--red)'}
+    if(e.action==='ALL TESTS PASSED'){document.getElementById('sTests').textContent='PASSED';document.getElementById('sTests').style.color='var(--green)'}
+    if(e.detail){document.getElementById('testBar').classList.add('show');document.getElementById('testOut').textContent=e.detail}
+  }
+
+  // Terminal log
+  const ts=e.timestamp?new Date(e.timestamp*1000).toLocaleTimeString('en-US',{hour12:false}):'';
+  const agentCls=e.agent?'a-'+e.agent:'';
+  const div=document.createElement('div');
+  div.className='log '+(e.status==='failed'?'status-failed':'')+(e.status==='blocked'?' status-blocked':'');
+  div.innerHTML=`<span class="log-ts">${ts}</span>`+
+    `<span class="log-agent ${agentCls}">${esc(e.agent||e.phase||'sys')}</span>`+
+    `<span class="log-phase ph-${e.phase||'system'}">${esc((e.phase||'').toUpperCase())}</span>`+
+    `<span class="log-msg">${esc(e.action||'')}${e.detail?' <span class="dim">'+esc(trunc(e.detail,100))+'</span>':''}</span>`;
+  term.appendChild(div);
+  term.scrollTop=term.scrollHeight;
+
+  // Timeline
+  addTL(e);
+
+  // Track agents
+  if(e.agent&&e.agent!=='nexus_runner'){
+    agentsSeen.add(e.agent);
+    updateAgentFlow();
+    addAgentLog(e);
+  }
+
+  // Immune events
+  if(e.phase==='immune'){
+    addImmuneEvent(e);
+    updateImmuneStats(e);
+  }
+
+  // Memory events
+  if(e.phase==='memory'){addMemoryEvent(e);updateMemoryStats(e)}
+
+  // Replay events
+  if(e.phase==='replay'){addReplayEvent(e)}
+
+  // Scan result
+  if(e.phase==='immune'&&e.action==='scan_result'){showScanResult(e)}
+
+  // LLM detail
+  if(e.phase==='llm'&&e.detail){
+    document.getElementById('detailTitle').textContent='LLM: '+(e.model||'');
+    document.getElementById('detailBox').textContent=e.detail+'\n\nTokens: '+(e.tokens_in||0)+' in / '+(e.tokens_out||0)+' out\nLatency: '+(e.latency_ms||0)+'ms\nModel: '+(e.model||'')
+  }
+
+  // Final
+  if(e.phase==='done'){
+    running=false;if(timer)clearInterval(timer);
+    document.getElementById('runBtn').disabled=false;document.getElementById('runBtn').textContent='RUN';
+    try{const d=JSON.parse(e.detail);document.getElementById('sTime').textContent=d.duration+'s'}catch(ex){}
+    loadReplayData();
+  }
+}
+
+function addTL(e){
+  if(e.phase==='system')return;
+  const icon=e.status==='failed'||e.status==='blocked'?'X':e.status==='running'?'~':'>';
+  const cls=e.status==='failed'||e.status==='blocked'?'failed':e.status==='running'?'running':'done';
+  const d=document.createElement('div');d.className='tl-item '+cls;
+  d.innerHTML=`<span class="ico2">${icon}</span><span class="tl-label">${esc(trunc(e.action||e.phase,28))}</span>`+
+    ((e.tokens_in||e.tokens_out)?`<span class="tl-meta">${(e.tokens_in||0)+(e.tokens_out||0)}t</span>`:'');
+  d.onclick=()=>{
+    document.getElementById('detailTitle').textContent=e.phase+' / '+e.action;
+    let txt=e.detail||'No detail';
+    try{txt=JSON.stringify(JSON.parse(txt),null,2)}catch(ex){}
+    document.getElementById('detailBox').textContent=txt+'\n\nAgent: '+(e.agent||'')+'\nTokens: '+(e.tokens_in||0)+'/'+(e.tokens_out||0)+'\nLatency: '+(e.latency_ms||0)+'ms\nCost: $'+(e.cost||0)};
+  tl.appendChild(d);tl.scrollTop=tl.scrollHeight;
+}
+
+function updateAgentFlow(){
+  const af=document.getElementById('agentFlow');af.innerHTML='';
+  const order=['workspace','localizer','reader','planner','coder','patcher','tester','immune_shield','persistent_cognition','episodic_memory','safety_monitor','reflection_engine','brancher','github'];
+  const active=new Set(agentsSeen);
+  order.forEach((a,i)=>{
+    const d=document.createElement('div');
+    d.style.cssText='padding:8px 12px;border-radius:6px;font-size:.7rem;font-family:var(--mono);border:1px solid var(--border);'+(active.has(a)?'background:var(--bg3);color:var(--green);border-color:rgba(74,222,128,.3)':'color:var(--text3)');
+    d.textContent=a;af.appendChild(d);
+    if(i<order.length-1){const arr=document.createElement('span');arr.textContent='->';arr.style.cssText='color:var(--text3);font-size:.7rem;display:flex;align-items:center';af.appendChild(arr)}
+  });
+}
+
+function addAgentLog(e){
+  const d=document.createElement('div');d.className='log';
+  d.innerHTML=`<span class="log-agent a-${e.agent}">${esc(e.agent)}</span><span class="log-msg">${esc(e.action)} <span class="dim">${esc(trunc(e.detail||'',80))}</span></span>`;
+  document.getElementById('agentLog').appendChild(d);
+}
+
+function addImmuneEvent(e){
+  const d=document.createElement('div');d.style.cssText='padding:6px 8px;border-bottom:1px solid var(--border);color:'+(e.status==='failed'||e.status==='blocked'?'var(--red)':'var(--green)');
+  d.textContent=(e.action||'')+' '+(e.detail?trunc(e.detail,120):'');
+  document.getElementById('immuneEvents').appendChild(d);
+}
+
+function updateImmuneStats(e){
+  if(e.action==='immune_stats'){
+    try{const s=JSON.parse(e.detail);document.getElementById('imTotal').textContent=s.total_calls||0;document.getElementById('imBlocked').textContent=s.total_blocked||0;document.getElementById('imRate').textContent=Math.round((s.block_rate||0)*100)+'%';document.getElementById('imAntibodies').textContent=s.antibodies||0}catch(ex){}
+  }
+}
+
+function showScanResult(e){
+  try{
+    const r=JSON.parse(e.detail);const d=document.getElementById('scanResult');
+    d.innerHTML=`<div class="threat-result"><div class="${r.allowed?'allowed':'blocked'}" style="font-size:.9rem;font-weight:600;margin-bottom:8px">${r.allowed?'ALLOWED':'BLOCKED'}</div>`+
+      `<div>Threat Score: ${r.threat_score||0}</div><div>Category: ${r.threat_category||'safe'}</div>`+
+      `<div>Confidence: ${r.confidence||0}</div><div>Action: ${r.action||''}</div>`+
+      `${r.reason?'<div>Reason: '+esc(r.reason)+'</div>':''}<div>Latency: ${r.latency_ms||0}ms</div></div>`;
+  }catch(ex){}
+}
+
+function addMemoryEvent(e){
+  const d=document.createElement('div');d.style.cssText='padding:6px 8px;border-bottom:1px solid var(--border);color:var(--violet)';
+  d.textContent=(e.action||'')+' '+(e.detail?trunc(e.detail,120):'');
+  document.getElementById('memoryEvents').appendChild(d);
+}
+
+function updateMemoryStats(e){
+  if(e.action==='episode_stored'){
+    try{const s=JSON.parse(e.detail);document.getElementById('memEntries').textContent=s.total_entries||0;document.getElementById('memSuccess').textContent=Math.round((s.success_rate||0)*100)+'%';document.getElementById('memGroups').textContent=(s.groups||[]).length;document.getElementById('memRetrieved').textContent=s.total_retrieved||0}catch(ex){}
+  }
+}
+
+function addReplayEvent(e){
+  const d=document.createElement('div');d.style.cssText='padding:6px 8px;border-bottom:1px solid var(--border);color:var(--cyan)';
+  let txt=e.action+' ';
+  try{const b=JSON.parse(e.detail);txt+=`Branch: ${b.branch_id} from step ${b.branch_point}`}catch(ex){txt+=trunc(e.detail||'',100)}
+  d.textContent=txt;document.getElementById('branchList').appendChild(d);
+  document.getElementById('rpBranches').textContent=document.getElementById('branchList').children.length;
+}
+
+async function loadReplayData(){
+  try{
+    const r=await fetch('/api/stats');const s=await r.json();
+    if(s.task_id){
+      const r2=await fetch('/api/replay/'+s.task_id);const d=await r2.json();
+      document.getElementById('rpEvents').textContent=(d.events||[]).length;
+      const rt=document.getElementById('replayTimeline');rt.innerHTML='';
+      (d.events||[]).forEach(ev=>{
+        const div=document.createElement('div');div.style.cssText='padding:4px 8px;border-left:2px solid var(--border);margin-left:8px;font-size:.7rem;color:var(--text2)';
+        div.textContent=`[${ev.event_type||''}] ${ev.action||''} ${ev.output_text?trunc(ev.output_text,60):''}`;
+        rt.appendChild(div);
+      });
+    }
+  }catch(ex){}
+}
+
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.add('hidden'));
+  document.getElementById('tab'+name.charAt(0).toUpperCase()+name.slice(1)).classList.add('active');
+  document.getElementById('panel'+name.charAt(0).toUpperCase()+name.slice(1)).classList.remove('hidden');
+}
+
+function submitTask(){
+  const input=document.getElementById('taskIn');const prompt=input.value.trim();
+  if(!prompt||!ws||ws.readyState!==1)return;
+  term.innerHTML='';tl.innerHTML='';eventCount=0;totalTokens=0;totalCost=0;taskStart=Date.now();running=true;
+  document.getElementById('cntEvents').textContent='0';
+  document.getElementById('sTokens').textContent='0';document.getElementById('sCost').textContent='$0.00';
+  document.getElementById('sTests').textContent='--';document.getElementById('sTests').style.color='';
+  document.getElementById('sTime').textContent='0s';
+  document.getElementById('testBar').classList.remove('show');
+  document.getElementById('runBtn').disabled=true;document.getElementById('runBtn').textContent='RUNNING';
+  document.getElementById('immuneEvents').innerHTML='';document.getElementById('memoryEvents').innerHTML='';
+  document.getElementById('branchList').innerHTML='';document.getElementById('replayTimeline').innerHTML='';
+  document.getElementById('agentLog').innerHTML='';agentsSeen.clear();updateAgentFlow();
+  document.getElementById('rpEvents').textContent='0';document.getElementById('rpBranches').textContent='0';
+  timer=setInterval(()=>{if(running)document.getElementById('sTime').textContent=((Date.now()-taskStart)/1000).toFixed(1)+'s'},100);
+  ws.send(JSON.stringify({type:'solve',prompt:prompt,repo_path:document.getElementById('repoSel').value}));
+}
+
+function scanThreat(){
+  const text=document.getElementById('scanIn')?.value||document.getElementById('taskIn').value;
+  if(!text||!ws||ws.readyState!==1)return;
+  ws.send(JSON.stringify({type:'scan',text:text}));
+  switchTab('immune');
+}
+
+document.getElementById('taskIn').addEventListener('keydown',e=>{if(e.key==='Enter')submitTask()});
+
+function esc(s){return s?s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'):''}
+function trunc(s,n){return s&&s.length>n?s.slice(0,n)+'...':s||''}
+
+connect();
+</script>
+</body>
+</html>

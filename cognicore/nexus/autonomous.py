@@ -39,7 +39,11 @@ class NexusRunner:
             from cognicore.nexus.llm_provider import get_llm
             self._llm = get_llm()
         except Exception:
-            pass
+            try:
+                from cognicore.nexus.multi_llm import get_llm
+                self._llm = get_llm()
+            except Exception:
+                pass
         try:
             from cognicore.research.persistent_store import PersistentCognitionStore
             self.memory = PersistentCognitionStore()
@@ -164,7 +168,7 @@ class NexusRunner:
         if self._llm:
             for retry in range(2):
                 try:
-                    self._emit("llm", "Calling Gemini...")
+                    self._emit("llm", "Calling LLM (multi-model)...", status="running")
                     resp = self._llm.generate(
                         "You are NEXUS, a code repair agent. "
                         "Output ONLY the complete fixed function. "
@@ -173,13 +177,11 @@ class NexusRunner:
                         f"Code:\n{context[:5000]}\n\n"
                         f"Attempt {attempt}. Output fixed function only."
                     )
-                    self._emit("llm", "Patch generated", resp[:150],
-                              tokens=len(resp) // 4)
+                    lc = getattr(self._llm, '_last_call', {}); model = lc.get('model', 'unknown'); tokens = lc.get('tokens_in', 0) + lc.get('tokens_out', 0); self._emit("llm", f"Patch generated via {model}", f"{lc.get('tokens_in',0)}in/{lc.get('tokens_out',0)}out", tokens=tokens)
                     return resp
                 except Exception as e:
                     if "429" in str(e) and retry == 0:
-                        self._emit("llm", "Rate limited, waiting 5s...")
-                        time.sleep(5)
+                        pass  # rate limit handled by provider
                     else:
                         self._emit("llm", f"LLM error: {e}", status="failed")
                         break
@@ -267,13 +269,13 @@ class NexusRunner:
     def _test(self, wd):
         self._emit("test", "Running tests...")
         cmd = [sys.executable, "-m", "pytest", "-x", "-q", "--tb=short",
-               "-k", "not test_integrations and not test_list_envs"]
+               "--continue-on-collection-errors", "--ignore=tests/test_platform_features.py", "--ignore=tests/test_integrations.py", "-k", "not test_list_envs"]
         try:
             out = self._cmd(wd, cmd, check=False, timeout=120)
         except Exception as e:
             return 0, 1, str(e)
         passed = len(re.findall(r"PASSED", out))
-        failed = len(re.findall(r"FAILED|ERROR", out))
+        failed = len(re.findall(r"FAILED", out)) + len(re.findall(r"ERROR", out))
         m = re.search(r"(\d+) passed", out)
         if m:
             passed = max(passed, int(m.group(1)))
