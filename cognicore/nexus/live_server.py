@@ -171,6 +171,77 @@ async def tasks():
 async def stats():
     return JSONResponse(_get().get_stats())
 
+# SWE-bench endpoints
+_swe_results = {}
+_swe_running = False
+
+@app.get("/api/swe/tasks")
+async def swe_tasks():
+    """List available SWE-bench mini tasks."""
+    try:
+        from cognicore.research.swebench import load_swebench_tasks
+        tasks = load_swebench_tasks()
+        return JSONResponse({"tasks": [
+            {"id": t.id, "repo": t.repo, "category": t.category,
+             "issue": t.issue, "description": t.description[:100]}
+            for t in tasks
+        ]})
+    except Exception as e:
+        return JSONResponse({"error": str(e), "tasks": []})
+
+@app.get("/api/swe/results")
+async def swe_results():
+    """Get latest SWE-bench results."""
+    return JSONResponse(_swe_results if _swe_results else {"status": "no results yet"})
+
+@app.get("/api/swe/status")
+async def swe_status():
+    """Check if a benchmark is running."""
+    return JSONResponse({"running": _swe_running, "has_results": bool(_swe_results)})
+
+@app.post("/api/swe/run")
+async def swe_run(body: dict = {}):
+    """Start a SWE-bench run in background."""
+    global _swe_running
+    if _swe_running:
+        return JSONResponse({"error": "Already running"}, status_code=409)
+    mode = body.get("mode", "mini")
+    attempts = body.get("attempts", 3)
+    limit = body.get("limit", 50)
+    threading.Thread(target=_run_swe, args=(mode, attempts, limit), daemon=True).start()
+    return JSONResponse({"status": "started", "mode": mode})
+
+def _run_swe(mode, attempts, limit):
+    global _swe_results, _swe_running
+    _swe_running = True
+    try:
+        from cognicore.nexus.swe_runner import NexusSWERunner
+        runner = NexusSWERunner(max_attempts=attempts, on_event=_swe_broadcast)
+        if mode == "mini":
+            results = runner.run_mini_bench()
+        else:
+            results = runner.run_swebench_lite(limit=limit)
+        results.compute()
+        _swe_results = results.to_dict()
+        # Export predictions
+        out_dir = Path(__file__).parent.parent.parent / "experiments"
+        out_dir.mkdir(exist_ok=True)
+        results.export_predictions(str(out_dir / f"predictions_{mode}.jsonl"))
+    except Exception as e:
+        _swe_results = {"error": str(e)}
+    finally:
+        _swe_running = False
+
+def _swe_broadcast(event):
+    """Broadcast SWE-bench events to WebSocket clients."""
+    if not _sockets or not _loop: return
+    asyncio.run_coroutine_threadsafe(_send_all(json.dumps({
+        "phase": "swe_bench", "action": event.get("action", ""),
+        "detail": event.get("detail", ""), "status": event.get("status", ""),
+        "task_id": event.get("task_id", ""), "timestamp": event.get("timestamp", 0),
+    })), _loop)
+
+
 @app.get("/")
 async def ui():
     p = Path(__file__).parent / "live_ui.html"
@@ -185,3 +256,4 @@ if __name__ == "__main__":
     print(f"  http://localhost:{port}")
     print(f"  WebSocket: ws://localhost:{port}/ws\n")
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
+
