@@ -1,6 +1,6 @@
 [project]
 name = "cognicore-env"
-version = "0.8.2"
+version = "0.8.3"
 description = "Cognitive RL environments with Memory, Reflection and Reward Shaping. SB3/Gymnasium compatible."
 readme = "README.md"
 license = {text = "MIT"}
