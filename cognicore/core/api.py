@@ -40,10 +40,10 @@ def _validate_env(env: Any) -> None:
 
 
 def _validate_episodes(episodes: int) -> None:
-    """Ensure episodes is a positive integer."""
-    if not isinstance(episodes, int) or episodes < 1:
-        raise CogniCoreError(
-            f"episodes must be a positive integer, got {episodes!r}."
+    """Ensure episodes is a non-negative integer."""
+    if not isinstance(episodes, int) or episodes < 0:
+        raise ValueError(
+            f"episodes must be a non-negative integer, got {episodes!r}."
         )
 
 

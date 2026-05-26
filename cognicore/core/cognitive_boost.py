@@ -222,7 +222,7 @@ class AutoCurriculum:
 
     def get_env_id(self) -> str:
         level = self.levels[self.current_level]
-        return f"{self.env_base}-{level}-v1"
+        return f"{self.env_base}-{level}"
 
     def get_env(self):
         import cognicore as cc
