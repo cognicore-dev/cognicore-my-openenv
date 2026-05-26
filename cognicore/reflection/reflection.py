@@ -104,7 +104,15 @@ class Reflection:
             return None
 
         worst_prediction = max(bad, key=bad.get)
-        fail_count = bad[worst_prediction]
+        # Skip empty action names
+        if not worst_prediction.strip():
+            non_empty = {k: v for k, v in bad.items() if k.strip()}
+            if not non_empty:
+                return None
+            worst_prediction = max(non_empty, key=non_empty.get)
+            fail_count = non_empty[worst_prediction]
+        else:
+            fail_count = bad[worst_prediction]
 
         if fail_count < 2:
             return None
@@ -119,8 +127,9 @@ class Reflection:
 
         return " ".join(hint_parts)
 
+    @property
     def override_rate(self) -> float:
-        """Return the fraction of suggestions that were overrides."""
+        """Fraction of suggestions that were overrides."""
         if self._suggestion_count == 0:
             return 0.0
         return self._override_count / self._suggestion_count
@@ -130,5 +139,5 @@ class Reflection:
         return {
             "total_suggestions": self._suggestion_count,
             "overrides": self._override_count,
-            "override_rate": self.override_rate(),
+            "override_rate": self.override_rate,
         }

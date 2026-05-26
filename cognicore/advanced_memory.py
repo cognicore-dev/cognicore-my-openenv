@@ -42,7 +42,7 @@ class SemanticMemory:
         self,
         max_size: int = 10_000,
         decay_rate: float = 0.95,
-        similarity_threshold: float = 0.1,
+        similarity_threshold: float = 0.01,
     ):
         self.entries: List[Dict[str, Any]] = []
         self.max_size = max_size
@@ -204,7 +204,13 @@ class SemanticMemory:
     def best_actions(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
         """Retrieve the best past actions for similar situations."""
         results = self.semantic_search(query, top_k=20)
-        successes = [(e, s) for e, s in results if e.get("correct", False)]
+        # Fallback: if semantic search found nothing, try category match
+        if not results:
+            results = [
+                (e, 1.0) for e in self.entries
+                if e.get("category", "").lower() == query.lower()
+            ]
+        successes = [(e, s) for e, s in results if e.get("correct") is True]
         successes.sort(key=lambda x: -x[1])
         return [
             {k: v for k, v in e.items() if not k.startswith("_")}
@@ -214,7 +220,13 @@ class SemanticMemory:
     def worst_actions(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
         """Retrieve the worst past actions (what NOT to do)."""
         results = self.semantic_search(query, top_k=20)
-        failures = [(e, s) for e, s in results if not e.get("correct", False)]
+        # Fallback: if semantic search found nothing, try category match
+        if not results:
+            results = [
+                (e, 1.0) for e in self.entries
+                if e.get("category", "").lower() == query.lower()
+            ]
+        failures = [(e, s) for e, s in results if e.get("correct") is False]
         failures.sort(key=lambda x: -x[1])
         return [
             {k: v for k, v in e.items() if not k.startswith("_")}
@@ -280,6 +292,7 @@ class SemanticMemory:
             "total_retrieved": self._stats["total_retrieved"],
             "semantic_hits": self._stats["semantic_hits"],
             "decay_evictions": self._stats["decay_evictions"],
+            "groups": sorted(list(set(e.get("category") for e in self.entries if e.get("category")))),
         }
 
     def clear(self) -> None:
@@ -288,3 +301,96 @@ class SemanticMemory:
         self._doc_freq.clear()
         self._total_docs = 0
         self._step_count = 0
+
+    # ------------------------------------------------------------------
+    # Opt 2: Memory Consolidation
+    # ------------------------------------------------------------------
+
+    def consolidate(self, threshold: int = 1000) -> int:
+        """Merge similar failure/success entries to reduce memory bloat.
+
+        After ``threshold`` entries, groups entries by category + correct
+        status and merges them into high-confidence summary entries.
+
+        Returns the number of entries removed by consolidation.
+        """
+        if len(self.entries) < threshold:
+            return 0
+
+        from collections import defaultdict
+        buckets: dict = defaultdict(list)
+        for e in self.entries:
+            key = (e.get("category", ""), e.get("correct", False))
+            buckets[key].append(e)
+
+        removed = 0
+        new_entries = []
+        for (cat, correct), group in buckets.items():
+            if len(group) <= 5:
+                # Keep small groups as-is
+                new_entries.extend(group)
+                continue
+
+            # Keep the 3 most recent entries verbatim
+            group.sort(key=lambda e: e.get("_stored_step", 0))
+            keep = group[-3:]
+            merge_candidates = group[:-3]
+
+            # Consolidate the rest into a single summary entry
+            actions = defaultdict(int)
+            for e in merge_candidates:
+                action = e.get("action", e.get("predicted", "unknown"))
+                actions[action] += 1
+
+            best_action = max(actions, key=actions.get) if actions else "unknown"
+            summary = {
+                "text": f"[consolidated] {cat} ({len(merge_candidates)} entries)",
+                "category": cat,
+                "correct": correct,
+                "action": best_action,
+                "consolidated_count": len(merge_candidates),
+                "_stored_step": self._step_count,
+                "_stored_time": __import__("time").time(),
+                "_relevance": sum(e.get("_relevance", 0.5) for e in merge_candidates) / len(merge_candidates),
+                "_tokens": self._tokenize(cat),
+            }
+            new_entries.append(summary)
+            new_entries.extend(keep)
+            removed += len(merge_candidates) - 1  # -1 for the summary
+
+        self.entries = new_entries
+        return removed
+
+    # ------------------------------------------------------------------
+    # Opt 4: Export for research
+    # ------------------------------------------------------------------
+
+    def export_jsonl(self, output_path: str) -> int:
+        """Export memory entries as JSONL for research / training data.
+
+        Strips internal fields (``_*``) and writes one JSON object per line.
+
+        Parameters
+        ----------
+        output_path : str
+            Path to write the JSONL file.
+
+        Returns
+        -------
+        int
+            Number of entries exported.
+        """
+        import json
+        from pathlib import Path
+
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        count = 0
+        with open(path, "w", encoding="utf-8") as f:
+            for entry in self.entries:
+                clean = {k: v for k, v in entry.items() if not k.startswith("_")}
+                f.write(json.dumps(clean, default=str) + "\n")
+                count += 1
+
+        return count

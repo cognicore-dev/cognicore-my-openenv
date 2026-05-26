@@ -108,7 +108,16 @@ class ReflectionEngine:
             return None
 
         worst_prediction = max(bad, key=bad.get)
-        fail_count = bad[worst_prediction]
+        # Skip empty action names
+        if not worst_prediction.strip():
+            # Try next worst non-empty prediction
+            non_empty = {k: v for k, v in bad.items() if k.strip()}
+            if not non_empty:
+                return None
+            worst_prediction = max(non_empty, key=non_empty.get)
+            fail_count = non_empty[worst_prediction]
+        else:
+            fail_count = bad[worst_prediction]
 
         if fail_count < self.failure_threshold:
             return None
@@ -162,6 +171,7 @@ class ReflectionEngine:
     # Stats
     # ------------------------------------------------------------------
 
+    @property
     def override_rate(self) -> float:
         """Fraction of suggestions that resulted in an override."""
         if self._suggestion_count == 0:
@@ -172,6 +182,6 @@ class ReflectionEngine:
         return {
             "total_suggestions": self._suggestion_count,
             "overrides": self._override_count,
-            "override_rate": self.override_rate(),
+            "override_rate": self.override_rate,
             "hints_given": self._hints_given,
         }

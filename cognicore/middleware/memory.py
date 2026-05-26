@@ -204,3 +204,27 @@ class Memory:
     def clear(self) -> None:
         """Clear all entries."""
         self.entries.clear()
+
+    def export_jsonl(self, output_path: str) -> int:
+        """Export memory entries as JSONL for research / training data.
+
+        Strips internal fields (``_*``) and writes one JSON object per line.
+
+        Returns
+        -------
+        int
+            Number of entries exported.
+        """
+        from pathlib import Path
+
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        count = 0
+        with open(path, "w", encoding="utf-8") as f:
+            for entry in self.entries:
+                clean = {k: v for k, v in entry.items() if not k.startswith("_")}
+                f.write(json.dumps(clean, default=str) + "\n")
+                count += 1
+
+        return count
