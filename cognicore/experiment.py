@@ -108,7 +108,7 @@ class Experiment:
 
                     # RL agents might have learn()
                     if hasattr(_agent, "learn"):
-                        _agent.learn(reward.total)
+                        _agent.learn(reward, info)
 
                     if done:
                         break

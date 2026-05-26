@@ -208,7 +208,8 @@ class AutoCurriculum:
         promote_threshold: float = 0.7,
         demote_threshold: float = 0.3,
     ):
-        self.env_base = env_base
+        # Strip -v1 suffix so we can rebuild it properly
+        self.env_base = env_base.removesuffix("-v1")
         self.levels = levels or ["Easy", "Medium", "Hard"]
         self.current_level: int = 0
         self.window = window
@@ -222,7 +223,7 @@ class AutoCurriculum:
 
     def get_env_id(self) -> str:
         level = self.levels[self.current_level]
-        return f"{self.env_base}-{level}"
+        return f"{self.env_base}-{level}-v1"
 
     def get_env(self):
         import cognicore as cc
