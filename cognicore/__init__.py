@@ -103,7 +103,7 @@ from cognicore.cost_tracker import CostTracker
 
 # Research-grade features
 from cognicore.predictive import FailurePredictor
-from cognicore.multi_memory import CognitiveMemory
+from cognicore.multi_memory import CognitiveMemory, UnifiedMemory
 from cognicore.red_blue import RedVsBlue
 from cognicore.debugger import AIDebugger
 from cognicore.intelligence import IntelligenceScorer
@@ -201,6 +201,7 @@ __all__ = [
     # Research-grade
     "FailurePredictor",
     "CognitiveMemory",
+    "UnifiedMemory",
     "RedVsBlue",
     "AIDebugger",
     "IntelligenceScorer",

@@ -181,13 +181,15 @@ class SemanticMemory:
             sim = self._cosine_similarity(query_vec, entry_vec)
 
             if sim >= self.similarity_threshold:
-                # Combined score: semantic similarity × recency decay
-                combined = sim * entry["_relevance"]
-                scored.append((entry, combined))
+                # Rank by combined (similarity × decay), but return raw sim
+                # so consumers see actual match quality
+                combined = sim * entry.get("_relevance", 1.0)
+                scored.append((entry, sim, combined))
                 self._stats["semantic_hits"] += 1
 
-        scored.sort(key=lambda x: -x[1])
-        return scored[:top_k]
+        # Sort by combined score (decay-weighted) but return raw sim
+        scored.sort(key=lambda x: -x[2])
+        return [(entry, sim) for entry, sim, _ in scored[:top_k]]
 
     def recall(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
         """Simplified recall — returns entries without scores."""

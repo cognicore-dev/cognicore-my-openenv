@@ -74,6 +74,11 @@ class Memory:
     # Retrieve
     # ------------------------------------------------------------------
 
+    def _match_group(self, entry: Dict[str, Any], group_value: str) -> bool:
+        """Check if entry matches group_value using primary key + aliases."""
+        keys_to_check = {self.similarity_key, "category", "group", "type"}
+        return any(entry.get(k) == group_value for k in keys_to_check)
+
     def retrieve(
         self,
         group_value: str,
@@ -93,23 +98,17 @@ class Memory:
             Maximum number of results (most recent first).
         """
         self._stats["total_retrieved"] += 1
-        # Check primary key and common aliases
-        keys_to_check = {self.similarity_key, "category", "group", "type"}
-        similar = [
-            e for e in self.entries
-            if any(e.get(k) == group_value for k in keys_to_check)
-        ]
+        similar = [e for e in self.entries if self._match_group(e, group_value)]
         return similar[-top_k:][::-1]
 
     def retrieve_successes(
         self, group_value: str, top_k: int = 3
     ) -> List[Dict[str, Any]]:
         """Retrieve successful (correct=True) entries in a group."""
-        keys_to_check = {self.similarity_key, "category", "group", "type"}
         successes = [
             e
             for e in self.entries
-            if any(e.get(k) == group_value for k in keys_to_check) and e.get("correct")
+            if self._match_group(e, group_value) and e.get("correct") is True
         ]
         return successes[-top_k:][::-1]
 
@@ -117,11 +116,10 @@ class Memory:
         self, group_value: str, top_k: int = 3
     ) -> List[Dict[str, Any]]:
         """Retrieve failed (correct=False) entries in a group."""
-        keys_to_check = {self.similarity_key, "category", "group", "type"}
         failures = [
             e
             for e in self.entries
-            if any(e.get(k) == group_value for k in keys_to_check) and not e.get("correct")
+            if self._match_group(e, group_value) and e.get("correct") is False
         ]
         return failures[-top_k:][::-1]
 
@@ -144,11 +142,7 @@ class Memory:
 
     def has_seen_group(self, group_value: str) -> bool:
         """Return True if memory has any entries for this group."""
-        keys_to_check = {self.similarity_key, "category", "group", "type"}
-        return any(
-            any(e.get(k) == group_value for k in keys_to_check)
-            for e in self.entries
-        )
+        return any(self._match_group(e, group_value) for e in self.entries)
 
     # ------------------------------------------------------------------
     # Persistence
@@ -182,8 +176,8 @@ class Memory:
     def stats(self) -> Dict[str, Any]:
         """Return memory statistics."""
         total = len(self.entries)
-        successes = sum(1 for e in self.entries if e.get("correct"))
-        failures = total - successes
+        successes = sum(1 for e in self.entries if e.get("correct") is True)
+        failures = sum(1 for e in self.entries if e.get("correct") is False)
 
         groups = set(
             e.get(self.similarity_key)
@@ -215,8 +209,6 @@ class Memory:
         int
             Number of entries exported.
         """
-        from pathlib import Path
-
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
 

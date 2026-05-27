@@ -74,10 +74,13 @@ class ReflectionEngine:
         bad: Dict[str, int] = {}
 
         for entry in entries:
-            predicted = str(entry.get("predicted", ""))
-            if entry.get("correct"):
+            # Use predicted, fall back to action, then to "unknown"
+            predicted = str(entry.get("predicted") or entry.get("action") or "unknown").strip()
+            if not predicted:
+                predicted = "unknown"
+            if entry.get("correct") is True:
                 good[predicted] = good.get(predicted, 0) + 1
-            else:
+            elif entry.get("correct") is False:
                 bad[predicted] = bad.get(predicted, 0) + 1
 
         recommendation = max(good, key=good.get) if good else None
@@ -103,21 +106,13 @@ class ReflectionEngine:
         if analysis["n_similar"] < self.min_samples:
             return None
 
-        bad = analysis["bad_predictions"]
+        # Filter out empty-string keys from bad predictions
+        bad = {k: v for k, v in analysis["bad_predictions"].items() if k.strip()}
         if not bad:
             return None
 
         worst_prediction = max(bad, key=bad.get)
-        # Skip empty action names
-        if not worst_prediction.strip():
-            # Try next worst non-empty prediction
-            non_empty = {k: v for k, v in bad.items() if k.strip()}
-            if not non_empty:
-                return None
-            worst_prediction = max(non_empty, key=non_empty.get)
-            fail_count = non_empty[worst_prediction]
-        else:
-            fail_count = bad[worst_prediction]
+        fail_count = bad[worst_prediction]
 
         if fail_count < self.failure_threshold:
             return None

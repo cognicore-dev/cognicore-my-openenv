@@ -45,10 +45,12 @@ class Reflection:
         bad = {}
 
         for entry in entries:
-            predicted = entry["predicted"]
-            if entry["correct"]:
+            predicted = str(entry.get("predicted") or entry.get("action") or "unknown").strip()
+            if not predicted:
+                predicted = "unknown"
+            if entry.get("correct") is True:
                 good[predicted] = good.get(predicted, 0) + 1
-            else:
+            elif entry.get("correct") is False:
                 bad[predicted] = bad.get(predicted, 0) + 1
 
         # Find most common correct prediction for this category
@@ -99,20 +101,13 @@ class Reflection:
         if analysis["n_similar"] < 2:
             return None
 
-        bad = analysis["bad_predictions"]
+        # Filter out empty-string keys from bad predictions
+        bad = {k: v for k, v in analysis["bad_predictions"].items() if k.strip()}
         if not bad:
             return None
 
         worst_prediction = max(bad, key=bad.get)
-        # Skip empty action names
-        if not worst_prediction.strip():
-            non_empty = {k: v for k, v in bad.items() if k.strip()}
-            if not non_empty:
-                return None
-            worst_prediction = max(non_empty, key=non_empty.get)
-            fail_count = non_empty[worst_prediction]
-        else:
-            fail_count = bad[worst_prediction]
+        fail_count = bad[worst_prediction]
 
         if fail_count < 2:
             return None
