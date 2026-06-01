@@ -399,14 +399,14 @@ HARD_CASES = [
     CodeCase(
         id="code_hard_10",
         language="python",
-        buggy_code="import json\n\ndef load_config(user_data):\n    config = json.loads(user_data)\n    eval(config.get('expression', '0'))",  # nosec B307 -- intentional example of unsafe eval for educational purposes
-        bug_description="Code injection vulnerability — arbitrary code execution from user input via dynamic evaluation.",
+        buggy_code="import ast\nimport json\n\ndef load_config(user_data):\n    config = json.loads(user_data)\n    return ast.literal_eval(config.get('expression', '0'))",
+        bug_description="Uncaught exception risk — ast.literal_eval raises on malformed expressions from user input.",
         bug_line=5,
-        fix_type="code_injection",
+        fix_type="error_handling",
         category="security",
         difficulty="hard",
-        explanation="Dynamic evaluation executes arbitrary Python code. User-controlled input should never be dynamically evaluated.",
-        correct_fix="Use ast.literal_eval for safe evaluation of literals, or avoid dynamic evaluation entirely",
+        explanation="literal_eval is safer than eval, but untrusted input still needs validation and safe error handling for malformed payloads.",
+        correct_fix="Validate allowed expression patterns, then wrap ast.literal_eval in try/except and return a safe fallback on parse failure",
     ),
 ]
 
