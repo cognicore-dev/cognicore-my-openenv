@@ -79,13 +79,12 @@ class SemanticMemory:
         return {t: c / total for t, c in counts.items()}
 
     def _compute_idf(self, term: str) -> float:
-        """Inverse document frequency."""
+        """Inverse document frequency (smoothed)."""
         if self._total_docs == 0:
-            return 0
+            return 0.0
         df = self._doc_freq.get(term, 0)
-        if df == 0:
-            return 0
-        return math.log(self._total_docs / df)
+        # Smoothed IDF: log((1 + N) / (1 + df)) + 1
+        return math.log((1 + self._total_docs) / (1 + df)) + 1.0
 
     def _tfidf_vector(self, text: str) -> Dict[str, float]:
         """Compute TF-IDF vector for a text."""

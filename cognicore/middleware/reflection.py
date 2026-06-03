@@ -74,16 +74,17 @@ class ReflectionEngine:
         bad: Dict[str, int] = {}
 
         for entry in entries:
-            # Use predicted, fall back to action, then to "unknown"
-            predicted = str(entry.get("predicted") or entry.get("action") or "unknown").strip()
-            if not predicted:
-                predicted = "unknown"
+            # Use predicted, fall back to action, else empty string
+            predicted = str(entry.get("predicted") or entry.get("action") or "").strip()
+            
             if entry.get("correct") is True:
                 good[predicted] = good.get(predicted, 0) + 1
             elif entry.get("correct") is False:
                 bad[predicted] = bad.get(predicted, 0) + 1
 
-        recommendation = max(good, key=good.get) if good else None
+        # Filter out empty string from good predictions before recommending
+        good_filtered = {k: v for k, v in good.items() if k.strip()}
+        recommendation = max(good_filtered, key=good_filtered.get) if good_filtered else None
 
         return {
             "n_similar": len(entries),

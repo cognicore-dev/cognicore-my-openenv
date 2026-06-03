@@ -45,18 +45,16 @@ class Reflection:
         bad = {}
 
         for entry in entries:
-            predicted = str(entry.get("predicted") or entry.get("action") or "unknown").strip()
-            if not predicted:
-                predicted = "unknown"
+            predicted = str(entry.get("predicted") or entry.get("action") or "").strip()
+            
             if entry.get("correct") is True:
                 good[predicted] = good.get(predicted, 0) + 1
             elif entry.get("correct") is False:
                 bad[predicted] = bad.get(predicted, 0) + 1
 
-        # Find most common correct prediction for this category
-        recommendation = None
-        if good:
-            recommendation = max(good, key=good.get)
+        # Find most common correct prediction for this category (excluding empty)
+        good_filtered = {k: v for k, v in good.items() if k.strip()}
+        recommendation = max(good_filtered, key=good_filtered.get) if good_filtered else None
 
         return {
             "n_similar": len(entries),
