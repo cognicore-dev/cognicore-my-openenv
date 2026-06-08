@@ -86,8 +86,9 @@ class AutoLearner:
         # 5. Default
         return {"classification": random.choice(self.actions)}
 
-    def learn(self, reward, info: Dict[str, Any]):
+    def learn(self, reward, info: Optional[Dict[str, Any]] = None):
         """Update knowledge from reward and eval result."""
+        if info is None: info = {}
         er = info.get("eval_result", {})
         category = er.get("category", "unknown")
         action = er.get("predicted", "")
@@ -159,7 +160,8 @@ class SafeAgent:
         # When uncertain: flag for review (conservative)
         return {"classification": "NEEDS_REVIEW"}
 
-    def learn(self, reward, info: Dict[str, Any]):
+    def learn(self, reward, info: Optional[Dict[str, Any]] = None):
+        if info is None: info = {}
         er = info.get("eval_result", {})
         if er.get("correct"):
             self.knowledge[er.get("category", "?")] = er.get("predicted", "SAFE")
@@ -228,7 +230,8 @@ class AdaptiveAgent:
 
         return {"classification": random.choice(self.actions)}
 
-    def learn(self, reward, info: Dict[str, Any]):
+    def learn(self, reward, info: Optional[Dict[str, Any]] = None):
+        if info is None: info = {}
         er = info.get("eval_result", {})
         category = er.get("category", "unknown")
         predicted = er.get("predicted", "")

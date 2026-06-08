@@ -45,16 +45,16 @@ class Reflection:
         bad = {}
 
         for entry in entries:
-            predicted = entry["predicted"]
-            if entry["correct"]:
+            predicted = str(entry.get("predicted") or entry.get("action") or "").strip()
+            
+            if entry.get("correct") is True:
                 good[predicted] = good.get(predicted, 0) + 1
-            else:
+            elif entry.get("correct") is False:
                 bad[predicted] = bad.get(predicted, 0) + 1
 
-        # Find most common correct prediction for this category
-        recommendation = None
-        if good:
-            recommendation = max(good, key=good.get)
+        # Find most common correct prediction for this category (excluding empty)
+        good_filtered = {k: v for k, v in good.items() if k.strip()}
+        recommendation = max(good_filtered, key=good_filtered.get) if good_filtered else None
 
         return {
             "n_similar": len(entries),
@@ -99,7 +99,8 @@ class Reflection:
         if analysis["n_similar"] < 2:
             return None
 
-        bad = analysis["bad_predictions"]
+        # Filter out empty-string keys from bad predictions
+        bad = {k: v for k, v in analysis["bad_predictions"].items() if k.strip()}
         if not bad:
             return None
 
@@ -119,8 +120,9 @@ class Reflection:
 
         return " ".join(hint_parts)
 
+    @property
     def override_rate(self) -> float:
-        """Return the fraction of suggestions that were overrides."""
+        """Fraction of suggestions that were overrides."""
         if self._suggestion_count == 0:
             return 0.0
         return self._override_count / self._suggestion_count
@@ -130,5 +132,5 @@ class Reflection:
         return {
             "total_suggestions": self._suggestion_count,
             "overrides": self._override_count,
-            "override_rate": self.override_rate(),
+            "override_rate": self.override_rate,
         }

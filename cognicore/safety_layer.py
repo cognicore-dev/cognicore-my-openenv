@@ -110,6 +110,10 @@ class SafetyLayer:
         "bias": 50,
         "discrimination": 60,
         "misinformation": 65,
+        "rm -rf": 100,
+        "sudo": 80,
+        "drop table": 100,
+        "delete from": 90,
     }
 
     def __init__(self):

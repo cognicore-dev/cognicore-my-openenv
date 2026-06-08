@@ -73,11 +73,17 @@ class TestTrain:
         with pytest.raises(CogniCoreError):
             train(agent, object(), episodes=1)
 
-    def test_train_invalid_episodes_raises(self):
+    def test_train_zero_episodes_returns_agent(self):
         agent = _AlwaysSafeAgent()
         env = cognicore.make("SafetyClassification-v1", difficulty="easy")
-        with pytest.raises(CogniCoreError):
-            train(agent, env, episodes=0)
+        result = train(agent, env, episodes=0)
+        assert result is agent
+
+    def test_train_negative_episodes_raises(self):
+        agent = _AlwaysSafeAgent()
+        env = cognicore.make("SafetyClassification-v1", difficulty="easy")
+        with pytest.raises(ValueError):
+            train(agent, env, episodes=-1)
 
     def test_train_with_random_agent(self):
         agent = RandomAgent()
@@ -112,7 +118,7 @@ class TestEvaluate:
     def test_evaluate_invalid_episodes_raises(self):
         agent = _AlwaysSafeAgent()
         env = cognicore.make("SafetyClassification-v1", difficulty="easy")
-        with pytest.raises(CogniCoreError):
+        with pytest.raises(ValueError):
             evaluate(agent, env, episodes=-1)
 
     def test_evaluate_perfect_agent_higher_score(self):

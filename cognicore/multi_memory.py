@@ -46,6 +46,24 @@ class WorkingMemory:
     def clear(self) -> None:
         self._items.clear()
 
+    def query_relevant(self, query: str, n: int = 3) -> List[Dict]:
+        """Return items most relevant to the query, based on keyword overlap."""
+        if not query or not self._items:
+            return self.most_recent(n)
+        query_tokens = set(query.lower().split())
+        scored = []
+        for item in self._items:
+            text = str(item.get("text", "")) + " " + str(item.get("category", ""))
+            item_tokens = set(text.lower().split())
+            overlap = len(query_tokens & item_tokens)
+            scored.append((item, overlap))
+        # Sort by overlap descending, break ties by recency (later = more recent)
+        scored.sort(key=lambda x: x[1], reverse=True)
+        if scored and scored[0][1] == 0:
+            # No overlap at all — fall back to most recent
+            return self.most_recent(n)
+        return [item for item, _ in scored[:n]]
+
     @property
     def size(self) -> int:
         return len(self._items)
@@ -267,7 +285,7 @@ class CognitiveMemory:
         Returns a unified context with contributions from each tier.
         """
         result = {
-            "working_memory": self.working.most_recent(3),
+            "working_memory": self.working.query_relevant(query, 3),
             "episodic": [],
             "semantic": None,
             "procedural": None,
@@ -345,3 +363,126 @@ class CognitiveMemory:
                 print(
                     f"      {r['rule']} ({r['confidence']:.0%}, n={r['observations']})"
                 )
+
+
+# ---------------------------------------------------------------------------
+# Opt 3: Unified Memory — Cross-system sync
+# ---------------------------------------------------------------------------
+
+
+class UnifiedMemory:
+    """Unified wrapper that writes to all memory systems simultaneously.
+
+    Solves the fragmentation problem when an agent uses Memory,
+    SemanticMemory, and CognitiveMemory independently.
+
+    Usage::
+
+        from cognicore.multi_memory import UnifiedMemory
+
+        mem = UnifiedMemory()
+        mem.store(text="phishing email", category="security",
+                  correct=False, action="SAFE")
+        context = mem.recall("suspicious email", category="security")
+        # -> combined results from all 3 memory systems
+    """
+
+    def __init__(
+        self,
+        working_capacity: int = 7,
+        episodic_max: int = 5000,
+        semantic_decay: float = 0.95,
+        memory_max_size: int = 10_000,
+    ):
+        from cognicore.middleware.memory import Memory
+        from cognicore.advanced_memory import SemanticMemory
+
+        self.basic = Memory(max_size=memory_max_size)
+        self.semantic = SemanticMemory(
+            max_size=memory_max_size, decay_rate=semantic_decay
+        )
+        self.cognitive = CognitiveMemory(
+            working_capacity=working_capacity, episodic_max=episodic_max
+        )
+
+    def store(
+        self,
+        text: str,
+        category: str,
+        correct: bool,
+        action: str = "",
+        **extra,
+    ) -> None:
+        """Store an experience across all 3 memory systems."""
+        entry = {
+            "text": text,
+            "category": category,
+            "correct": correct,
+            "action": action,
+            **extra,
+        }
+
+        # Basic memory
+        self.basic.store(entry)
+
+        # Semantic memory (TF-IDF indexed)
+        self.semantic.store(entry)
+
+        # Cognitive memory (4-tier human-like)
+        self.cognitive.perceive(text, category, correct, action, **extra)
+
+    def recall(
+        self, query: str = "", category: str = "", top_k: int = 5
+    ) -> Dict[str, Any]:
+        """Recall from all memory systems, merged into one context.
+
+        Returns
+        -------
+        dict
+            Keys: ``basic``, ``semantic``, ``cognitive``, ``best_actions``,
+            ``worst_actions``, ``recommended_action``, ``confidence``.
+        """
+        result: Dict[str, Any] = {
+            "basic": [],
+            "semantic": [],
+            "cognitive": {},
+            "best_actions": [],
+            "worst_actions": [],
+            "recommended_action": None,
+            "confidence": 0.0,
+        }
+
+        # Basic memory
+        if category:
+            result["basic"] = self.basic.retrieve(category, top_k=top_k)
+
+        # Semantic memory
+        search_query = query or category
+        if search_query:
+            result["semantic"] = self.semantic.recall(search_query, top_k=top_k)
+            result["best_actions"] = self.semantic.best_actions(
+                search_query, top_k=3
+            )
+            result["worst_actions"] = self.semantic.worst_actions(
+                search_query, top_k=3
+            )
+
+        # Cognitive memory
+        cog = self.cognitive.recall(query=query, category=category)
+        result["cognitive"] = cog
+        result["recommended_action"] = cog.get("recommended_action")
+        result["confidence"] = cog.get("confidence", 0.0)
+
+        return result
+
+    def export_jsonl(self, output_path: str) -> int:
+        """Export all semantic memory entries as JSONL."""
+        return self.semantic.export_jsonl(output_path)
+
+    def stats(self) -> Dict[str, Any]:
+        """Combined statistics from all memory systems."""
+        return {
+            "basic": self.basic.stats(),
+            "semantic": self.semantic.stats(),
+            "cognitive": self.cognitive.stats(),
+        }

@@ -74,13 +74,17 @@ class ReflectionEngine:
         bad: Dict[str, int] = {}
 
         for entry in entries:
-            predicted = str(entry.get("predicted", ""))
-            if entry.get("correct"):
+            # Use predicted, fall back to action, else empty string
+            predicted = str(entry.get("predicted") or entry.get("action") or "").strip()
+            
+            if entry.get("correct") is True:
                 good[predicted] = good.get(predicted, 0) + 1
-            else:
+            elif entry.get("correct") is False:
                 bad[predicted] = bad.get(predicted, 0) + 1
 
-        recommendation = max(good, key=good.get) if good else None
+        # Filter out empty string from good predictions before recommending
+        good_filtered = {k: v for k, v in good.items() if k.strip()}
+        recommendation = max(good_filtered, key=good_filtered.get) if good_filtered else None
 
         return {
             "n_similar": len(entries),
@@ -103,7 +107,8 @@ class ReflectionEngine:
         if analysis["n_similar"] < self.min_samples:
             return None
 
-        bad = analysis["bad_predictions"]
+        # Filter out empty-string keys from bad predictions
+        bad = {k: v for k, v in analysis["bad_predictions"].items() if k.strip()}
         if not bad:
             return None
 
@@ -162,6 +167,7 @@ class ReflectionEngine:
     # Stats
     # ------------------------------------------------------------------
 
+    @property
     def override_rate(self) -> float:
         """Fraction of suggestions that resulted in an override."""
         if self._suggestion_count == 0:
@@ -172,6 +178,6 @@ class ReflectionEngine:
         return {
             "total_suggestions": self._suggestion_count,
             "overrides": self._override_count,
-            "override_rate": self.override_rate(),
+            "override_rate": self.override_rate,
             "hints_given": self._hints_given,
         }

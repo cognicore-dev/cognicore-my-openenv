@@ -22,7 +22,7 @@ Quick start::
     print(env.episode_stats())
 """
 
-__version__ = "0.7.0"
+__version__ = "0.9.2"
 
 # Core
 from cognicore.core.base_env import CogniCoreEnv
@@ -103,7 +103,7 @@ from cognicore.cost_tracker import CostTracker
 
 # Research-grade features
 from cognicore.predictive import FailurePredictor
-from cognicore.multi_memory import CognitiveMemory
+from cognicore.multi_memory import CognitiveMemory, UnifiedMemory
 from cognicore.red_blue import RedVsBlue
 from cognicore.debugger import AIDebugger
 from cognicore.intelligence import IntelligenceScorer
@@ -114,7 +114,8 @@ from cognicore.evolution import EvolutionEngine
 # Platform features
 from cognicore.persistence import save_agent, load_agent
 from cognicore.report import ReportGenerator
-from cognicore.replay import SessionRecorder, replay
+from cognicore.replay import EventRecorder, TaskReplayer, TaskBrancher, RLNavigator
+from cognicore.immune import NexusShield, RLDefender
 from cognicore.profiles import get_profile, list_profiles
 from cognicore.prompt_optimizer import PromptOptimizer
 from cognicore.webhooks import AlertSystem
@@ -200,6 +201,7 @@ __all__ = [
     # Research-grade
     "FailurePredictor",
     "CognitiveMemory",
+    "UnifiedMemory",
     "RedVsBlue",
     "AIDebugger",
     "IntelligenceScorer",
@@ -211,8 +213,12 @@ __all__ = [
     "save_agent",
     "load_agent",
     "ReportGenerator",
-    "SessionRecorder",
-    "replay",
+    "EventRecorder",
+    "TaskReplayer",
+    "TaskBrancher",
+    "RLNavigator",
+    "NexusShield",
+    "RLDefender",
     "get_profile",
     "list_profiles",
     "PromptOptimizer",

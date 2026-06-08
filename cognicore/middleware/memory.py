@@ -74,6 +74,11 @@ class Memory:
     # Retrieve
     # ------------------------------------------------------------------
 
+    def _match_group(self, entry: Dict[str, Any], group_value: str) -> bool:
+        """Check if entry matches group_value using primary key + aliases."""
+        keys_to_check = {self.similarity_key, "category", "group", "type"}
+        return any(entry.get(k) == group_value for k in keys_to_check)
+
     def retrieve(
         self,
         group_value: str,
@@ -81,15 +86,19 @@ class Memory:
     ) -> List[Dict[str, Any]]:
         """Retrieve the most recent entries sharing the same group value.
 
+        Checks both the configured ``similarity_key`` and common aliases
+        (``category``, ``group``, ``type``) so entries are found regardless
+        of which key the caller used when storing.
+
         Parameters
         ----------
         group_value : str
-            Value of the ``similarity_key`` to match.
+            Value to match.
         top_k : int
             Maximum number of results (most recent first).
         """
         self._stats["total_retrieved"] += 1
-        similar = [e for e in self.entries if e.get(self.similarity_key) == group_value]
+        similar = [e for e in self.entries if self._match_group(e, group_value)]
         return similar[-top_k:][::-1]
 
     def retrieve_successes(
@@ -99,7 +108,7 @@ class Memory:
         successes = [
             e
             for e in self.entries
-            if e.get(self.similarity_key) == group_value and e.get("correct")
+            if self._match_group(e, group_value) and e.get("correct") is True
         ]
         return successes[-top_k:][::-1]
 
@@ -110,7 +119,7 @@ class Memory:
         failures = [
             e
             for e in self.entries
-            if e.get(self.similarity_key) == group_value and not e.get("correct")
+            if self._match_group(e, group_value) and e.get("correct") is False
         ]
         return failures[-top_k:][::-1]
 
@@ -133,7 +142,7 @@ class Memory:
 
     def has_seen_group(self, group_value: str) -> bool:
         """Return True if memory has any entries for this group."""
-        return any(e.get(self.similarity_key) == group_value for e in self.entries)
+        return any(self._match_group(e, group_value) for e in self.entries)
 
     # ------------------------------------------------------------------
     # Persistence
@@ -167,8 +176,8 @@ class Memory:
     def stats(self) -> Dict[str, Any]:
         """Return memory statistics."""
         total = len(self.entries)
-        successes = sum(1 for e in self.entries if e.get("correct"))
-        failures = total - successes
+        successes = sum(1 for e in self.entries if e.get("correct") is True)
+        failures = sum(1 for e in self.entries if e.get("correct") is False)
 
         groups = set(
             e.get(self.similarity_key)
@@ -189,3 +198,25 @@ class Memory:
     def clear(self) -> None:
         """Clear all entries."""
         self.entries.clear()
+
+    def export_jsonl(self, output_path: str) -> int:
+        """Export memory entries as JSONL for research / training data.
+
+        Strips internal fields (``_*``) and writes one JSON object per line.
+
+        Returns
+        -------
+        int
+            Number of entries exported.
+        """
+        path = Path(output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        count = 0
+        with open(path, "w", encoding="utf-8") as f:
+            for entry in self.entries:
+                clean = {k: v for k, v in entry.items() if not k.startswith("_")}
+                f.write(json.dumps(clean, default=str) + "\n")
+                count += 1
+
+        return count

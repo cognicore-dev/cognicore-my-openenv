@@ -171,6 +171,7 @@ class TestAutoImprove:
             max_cycles=2,
             episodes_per_cycle=1,
             verbose=False,
+            target_accuracy=1.1,
         )
         assert "cycles" in result
         assert result["cycles"] == 2

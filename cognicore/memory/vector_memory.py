@@ -78,22 +78,29 @@ class VectorMemory:
             most recent first.
         """
         self._stats["total_retrieved"] += 1
-
-        similar = [e for e in self.entries if e["category"] == category]
+        keys_to_check = {"category", "group", "type"}
+        similar = [
+            e for e in self.entries
+            if any(e.get(k) == category for k in keys_to_check)
+        ]
         # Return most recent first
         return similar[-top_k:][::-1]
 
     def retrieve_successes(self, category: str, top_k: int = 3) -> List[Dict[str, Any]]:
         """Retrieve successful past classifications in this category."""
+        keys_to_check = {"category", "group", "type"}
         successes = [
-            e for e in self.entries if e["category"] == category and e["correct"]
+            e for e in self.entries
+            if any(e.get(k) == category for k in keys_to_check) and e.get("correct")
         ]
         return successes[-top_k:][::-1]
 
     def retrieve_failures(self, category: str, top_k: int = 3) -> List[Dict[str, Any]]:
         """Retrieve failed past classifications in this category."""
+        keys_to_check = {"category", "group", "type"}
         failures = [
-            e for e in self.entries if e["category"] == category and not e["correct"]
+            e for e in self.entries
+            if any(e.get(k) == category for k in keys_to_check) and not e.get("correct")
         ]
         return failures[-top_k:][::-1]
 
@@ -130,7 +137,7 @@ class VectorMemory:
             "success_rate": successes / total if total > 0 else 0.0,
             "total_stored": self._stats["total_stored"],
             "total_retrieved": self._stats["total_retrieved"],
-            "categories": list(set(e["category"] for e in self.entries)),
+            "groups": list(set(e["category"] for e in self.entries)),
         }
 
     def clear(self) -> None:

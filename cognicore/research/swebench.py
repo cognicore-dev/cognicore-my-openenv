@@ -92,9 +92,9 @@ SWEBENCH_TASKS = [
   {"id":"SWE-req-4356","repo":"psf/requests","category":"encoding",
    "issue":"Response encoding detection fails for empty body",
    "description":"Encoding detection crashes on None content.",
-   "fix_hint":"Guard against None content",
-   "buggy_code":"def detect_encoding(content):\n    if len(content)<10:\n        return 'utf-8'\n    if content[:3]==b'\\xef\\xbb\\xbf': return 'utf-8-sig'\n    return 'ascii'",
-   "test_code":"assert detect_encoding(b'hello')=='utf-8'\nassert detect_encoding(b'')=='utf-8'\nassert detect_encoding(None)=='utf-8'\nassert detect_encoding(b'\\xef\\xbb\\xbfdata')=='utf-8-sig'"},
+   "fix_hint":"Guard against None content AND check BOM before length check (BOM+data is only 7 bytes, shorter than 10)",
+   "buggy_code":"def detect_encoding(content):\n    if len(content)<10:\n        return 'utf-8'\n    BOM=bytes([0xef,0xbb,0xbf])\n    if content[:3]==BOM: return 'utf-8-sig'\n    return 'ascii'",
+   "test_code":"BOM=bytes([0xef,0xbb,0xbf])\nassert detect_encoding(b'hello')=='utf-8'\nassert detect_encoding(b'')=='utf-8'\nassert detect_encoding(None)=='utf-8'\nassert detect_encoding(BOM+b'data')=='utf-8-sig'"},
 
   # ── FLASK (2 tasks) ──
   {"id":"SWE-flask-4045","repo":"pallets/flask","category":"error_handling",

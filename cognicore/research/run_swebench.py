@@ -1,12 +1,22 @@
 #!/usr/bin/env python3
 """
-CogniCore SWE-bench Runner — 24 curated tasks, persistent cognition,
-ablation studies, multi-seed statistical evaluation.
+CogniCore SWE-bench Runner — Phase 1 Research-Grade
+
+Features:
+  - 20 curated SWE-bench-lite tasks across 9 repos
+  - Subprocess-isolated test execution (--isolated)
+  - Deterministic event logging with replay checksums
+  - Train/test split for clean evaluation (14 train / 6 test)
+  - Real LLM integration (auto-detect Gemini/OpenAI/Claude)
+  - Ablation studies (7 configs)
+  - Multi-seed statistical evaluation with confidence intervals
 
 Usage:
-  python -m cognicore.research.run_swebench                # standard run
-  python -m cognicore.research.run_swebench --ablation      # ablation study
-  python -m cognicore.research.run_swebench --seeds 5       # multi-seed stats
+  python -m cognicore.research.run_swebench                 # standard
+  python -m cognicore.research.run_swebench --isolated       # subprocess mode
+  python -m cognicore.research.run_swebench --ablation       # ablation study
+  python -m cognicore.research.run_swebench --seeds 5        # multi-seed
+  python -m cognicore.research.run_swebench --split test     # test-only
 """
 import sys, os, io, argparse, json, math, random, time, uuid, subprocess
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
@@ -20,15 +30,30 @@ from cognicore.research.patch_intelligence import (
 from cognicore.research.experiment import ExperimentConfig, ExperimentResult, ExperimentTracker
 from cognicore.research.prompt_mutation import PromptMutationEngine
 from cognicore.research.persistent_store import PersistentCognitionStore
+from cognicore.research.sandbox import sandbox_isolated, sandbox_fast
+from cognicore.research.event_logger import EventLogger, EventType
 
 SESSION = uuid.uuid4().hex[:8]
+EXP_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'experiments')
+
+# Train/test split — 14 train, 6 test (no memory leakage)
+TRAIN_IDS = {
+    'SWE-dj-11099','SWE-dj-13710','SWE-dj-12286','SWE-dj-15498',
+    'SWE-sym-18057','SWE-sym-17139','SWE-sym-20049','SWE-sym-15346',
+    'SWE-req-3390','SWE-req-4356','SWE-flask-4045','SWE-flask-4992',
+    'SWE-astro-6938','SWE-astro-7746',
+}
+TEST_IDS = {
+    'SWE-sk-12471','SWE-sk-15100','SWE-mpl-23314','SWE-mpl-23476',
+    'SWE-pyt-5413','SWE-pyt-7168',
+}
 
 def clog(tag, msg, detail=""):
     C = {"PATCH REJECTED":"\033[91m","MEMORY RETRIEVAL":"\033[33m",
          "REFLECTION":"\033[35m","STRATEGY MUTATION":"\033[36m",
          "SUCCESS":"\033[32m","FAILED":"\033[31m","PROMPT MUTATION":"\033[36m",
          "PERSISTENT":"\033[93m","INFO":"\033[37m","ABLATION":"\033[94m",
-         "FAILURE ANALYSIS":"\033[91m"}
+         "ISOLATED":"\033[94m","LLM":"\033[94m"}
     print(f"  {C.get(tag,chr(27)+'[0m')}[{tag}]\033[0m {msg}")
     if detail:
         for l in detail.strip().split("\n")[:3]:
@@ -49,6 +74,11 @@ def sandbox(code, tests):
         return False, output.splitlines()[-1] if output else f"Exit code {result.returncode}"
     except Exception as e:
         return False, f"{type(e).__name__}: {e}"
+def sandbox(code, tests, isolated=False):
+    if isolated:
+        ok, err, meta = sandbox_isolated(code, tests, timeout=30)
+        return ok, err
+    return sandbox_fast(code, tests)
 
 # ══════════════════════════════════════════════════════════
 # FIX DATABASE — rule-based fixes for all 24 tasks
@@ -157,13 +187,18 @@ ABLATION_CONFIGS = {
 # ══════════════════════════════════════════════════════════
 # SINGLE RUN
 # ══════════════════════════════════════════════════════════
-def run_single(config, ablation_cfg=None, quiet=False):
+def run_single(config, ablation_cfg=None, quiet=False, isolated=False,
+               split="all", logger=None):
     """Run one benchmark pass. Returns ExperimentTracker."""
     abl = ablation_cfg or ABLATION_CONFIGS["full_cognicore"]
     random.seed(config.seed)
     tasks = load_swebench_tasks()
-    tracker = ExperimentTracker(config, output_dir=os.path.join(
-        os.path.dirname(__file__), '..', '..', 'experiments'))
+    # Apply train/test split
+    if split == "train":
+        tasks = [t for t in tasks if t.id in TRAIN_IDS]
+    elif split == "test":
+        tasks = [t for t in tasks if t.id in TEST_IDS]
+    tracker = ExperimentTracker(config, output_dir=EXP_DIR)
     patches = PatchStore()
     mutation_engine = PromptMutationEngine()
     persistent = PersistentCognitionStore()
@@ -183,7 +218,7 @@ def run_single(config, ablation_cfg=None, quiet=False):
             h = patch_hash(patch)
             if h in b_hashes: result.baseline_repeated += 1
             b_hashes.add(h)
-            ok, err = sandbox(patch, task.test_code)
+            ok, err = sandbox(patch, task.test_code, isolated)
             if ok:
                 result.baseline_solved = True; break
             else:
@@ -249,7 +284,7 @@ def run_single(config, ablation_cfg=None, quiet=False):
 
             if h in c_hashes: result.cogni_repeated += 1
             c_hashes.add(h)
-            ok, err = sandbox(patch, task.test_code)
+            ok, err = sandbox(patch, task.test_code, isolated)
 
             if abl["memory"]:
                 runtime.memory.store({
@@ -396,17 +431,26 @@ def run_multi_seed(base_config, n_seeds=5):
 # MAIN
 # ══════════════════════════════════════════════════════════
 if __name__ == "__main__":
-    p = argparse.ArgumentParser(description="CogniCore SWE-bench Runner")
+    p = argparse.ArgumentParser(description="CogniCore SWE-bench Runner (Phase 1)")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--attempts", type=int, default=5)
     p.add_argument("--threshold", type=float, default=0.85)
     p.add_argument("--ablation", action="store_true", help="Run ablation study")
     p.add_argument("--seeds", type=int, default=0, help="Multi-seed runs (0=single)")
+    p.add_argument("--isolated", action="store_true", help="Subprocess test isolation")
+    p.add_argument("--split", default="all", choices=["all","train","test"],
+                   help="Task split: all, train (14), test (6)")
     a = p.parse_args()
 
     cfg = ExperimentConfig(seed=a.seed, max_attempts=a.attempts,
                             similarity_threshold=a.threshold,
                             experiment_name="swebench-lite")
+
+    if a.isolated:
+        clog("ISOLATED", "Subprocess test execution enabled")
+
+    if a.split != "all":
+        clog("INFO", f"Using {a.split} split ({len(TRAIN_IDS) if a.split=='train' else len(TEST_IDS)} tasks)")
 
     if a.ablation:
         run_ablation(cfg)
@@ -414,7 +458,12 @@ if __name__ == "__main__":
         run_multi_seed(cfg, a.seeds)
     else:
         cfg.print_config()
-        t = run_single(cfg)
+        logger = EventLogger(f"{SESSION}_{cfg.seed}", output_dir=EXP_DIR)
+        logger.log(EventType.EXPERIMENT_START, data=cfg.to_dict())
+        t = run_single(cfg, isolated=a.isolated, split=a.split, logger=logger)
         t.print_report()
         rp = t.save()
+        evt_path = logger.save()
         print(f"\n  Report: {rp}")
+        print(f"  Events: {evt_path} (checksum: {logger.get_checksum()})")
+        print(f"  Split: {a.split} | Isolated: {a.isolated}")
