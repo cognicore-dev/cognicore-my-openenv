@@ -83,8 +83,8 @@ class SemanticMemory:
         if self._total_docs == 0:
             return 0.0
         df = self._doc_freq.get(term, 0)
-        # Smoothed IDF: log((1 + N) / (1 + df)) + 1
-        return math.log((1 + self._total_docs) / (1 + df)) + 1.0
+        # Smoothed IDF: log(1 + N / (1 + df))
+        return math.log(1.0 + self._total_docs / (1.0 + df))
 
     def _tfidf_vector(self, text: str) -> Dict[str, float]:
         """Compute TF-IDF vector for a text."""
@@ -120,8 +120,8 @@ class SemanticMemory:
         """
         self._step_count += 1
 
-        # Extract text for indexing
-        text = entry.get("text", entry.get("prompt", entry.get("category", "")))
+        # Extract text for indexing, including category
+        text = str(entry.get("text", entry.get("prompt", ""))) + " " + str(entry.get("category", ""))
         tokens = self._tokenize(str(text))
 
         # Update document frequencies
@@ -173,9 +173,7 @@ class SemanticMemory:
 
         scored = []
         for entry in self.entries:
-            entry_text = entry.get(
-                "text", entry.get("prompt", entry.get("category", ""))
-            )
+            entry_text = str(entry.get("text", entry.get("prompt", ""))) + " " + str(entry.get("category", ""))
             entry_vec = self._tfidf_vector(str(entry_text))
             sim = self._cosine_similarity(query_vec, entry_vec)
 

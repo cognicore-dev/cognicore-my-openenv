@@ -18,6 +18,8 @@ class ThreatScore:
 # ── Pattern databases ────────────────────────────────────────────────
 INJECTION_PATTERNS = [
     (r"ignore\s+(all\s+)?previous\s+(instructions?|prompts?|rules?)", 0.95),
+    (r"ignore\s+(all\s+)?previous", 0.95),
+    (r"ignore\s+(all\s+)?instructions?", 0.95),
     (r"disregard\s+(all\s+)?(above|previous|prior)", 0.90),
     (r"forget\s+(your|all|everything)", 0.85),
     (r"new\s+instructions?\s*:", 0.90),

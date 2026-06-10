@@ -210,9 +210,11 @@ cognicore integrations                  # Manage integrations
 import cognicore
 
 # Rule-based learner (recommended starting point)
+# Note: Scores ~99% on basic envs because it memorizes past correct actions
 agent = cognicore.AutoLearner()
 
 # RL agents
+# Note: QLearning/SARSA typically score ~1% initially as they must learn from scratch via trial & error
 agent = cognicore.QLearningAgent(actions=["SAFE", "UNSAFE"])
 agent = cognicore.SARSAAgent(actions=["SAFE", "UNSAFE"])
 agent = cognicore.BanditAgent(actions=["SAFE", "UNSAFE"])
