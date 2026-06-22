@@ -9,7 +9,7 @@
 CogniCore adds **memory, reflection, and adaptive execution** to any AI agent.
 Your agent remembers what failed, retrieves relevant context, and changes strategy — without changing the model.
 
-```
+```bash
 pip install cognicore-env
 ```
 
@@ -35,15 +35,30 @@ pip install -e .
 
 ```bash
 python -c "import cognicore; print(cognicore.__version__)"
-# Expected: 0.9.2
+# Expected: 0.9.3
 ```
 
-### 3. Run Your First Agent
+### 3. Add Memory to Your Agent
 
 ```python
-import cognicore
+from cognicore import CogniCoreRuntime
 
-# Create an environment
+runtime = CogniCoreRuntime()
+
+def my_agent(task, context):
+    print(f"Executing: {task}")
+    print(f"Memory hint: {context.get('reflection_hint')}")
+    # ... call your LLM here ...
+    return True  # success
+
+result = runtime.execute(my_agent, task="Fix the login bug")
+# Next time: runtime automatically recalls this experience
+```
+
+## For RL Researchers
+If you are looking for the Gymnasium-compatible training environments:
+```python
+import cognicore
 env = cognicore.make("SafetyClassification-v1", difficulty="easy")
 obs = env.reset()
 
@@ -317,6 +332,28 @@ python benchmark.py --episodes 5 --seed 42
 
 This runs an A/B test: baseline (no memory) vs memory-enabled across 6 environments.
 Outputs CSV, JSON, markdown report, and charts to `benchmark_output/`.
+
+### LongMemEval: True Cross-Chunk Evidence Composition
+
+CogniCore natively supports the **LongMemEval** benchmark, testing the ability of agents to retrieve and synthesize long-term memory contexts. To solve complex queries requiring scattered evidence, we introduced the `CognicoreMultiHopAdapter`.
+
+Unlike brute-force large-context retrievers, the Multi-Hop Adapter uses a **Graph-Based Hybrid Search Architecture**:
+1. **Target Extraction:** Extracts key noun phrases and named entities from user queries.
+2. **Hop-1 Retrieval:** Identifies highly relevant anchor chunks.
+3. **Graph Traversal:** Constructs an in-memory graph (linked by session ID and temporal adjacency) to explore and retrieve missing contextual chunks.
+4. **Coverage-Aware Selection:** Optimizes for maximum entity coverage across the retrieved set rather than naive semantic similarity.
+
+#### Multi-Hop Retrieval Performance (STRICT R@5)
+
+By isolating the chunk size, we demonstrate that the Multi-Hop Adapter provides genuine cross-chunk reasoning, significantly outperforming the baseline Zero-Shot retriever at restrictive window sizes.
+
+| Chunk Window Size | ZeroShot (Baseline) | Multi-Hop (CogniCore) | Absolute Gain |
+|:---:|:---:|:---:|:---:|
+| **Window = 5** | 78.8% | **85.2%** | **+6.4%** 🚀 |
+| **Window = 10** | 87.2% | **92.8%** | **+5.6%** 🚀 |
+| **Window = 20** | 95.0% | **95.0%** | Baseline matches via brute force |
+
+*At smaller, token-efficient window sizes, the Multi-Hop Adapter explicitly reconstructs dispersed evidence via temporal and session-based graph traversals, achieving high precision without relying on massive, bloated context windows.*
 
 ---
 

@@ -29,9 +29,16 @@ rendering = ["pygame>=2.5"]
 memory = ["sentence-transformers>=2.0"]
 hf = ["huggingface-hub>=0.20"]
 llm = ["openai>=1.0"]
+embeddings = ["sentence-transformers>=2.0", "openai>=1.0"]
 server = ["fastapi>=0.110", "uvicorn>=0.27", "pydantic>=2.0"]
+mcp = ["mcp[cli]>=1.0"]
+langchain = ["langchain>=0.2"]
+crewai = ["crewai>=0.50"]
+openai-agents = ["openai-agents>=0.1"]
 dev = ["pytest>=7.0", "pytest-cov>=4.0", "httpx>=0.27"]
-all = ["cognicore-env[rl,rendering,memory,hf,llm,server,dev]"]
+all = [
+    "cognicore[rl,rendering,memory,hf,llm,embeddings,server,mcp,langchain,crewai,openai-agents,dev]"
+]
 
 [project.urls]
 Homepage = "https://github.com/Kaushalt2004/cognicore-my-openenv"
@@ -54,7 +61,7 @@ packages = ["cognicore"]
 include = ["cognicore/", "tests/", "examples/", "README.md", "LICENSE", "pyproject.toml"]
 
 [tool.ruff]
-line-length = 200
+line-length = 120
 
 [tool.ruff.lint]
 extend-ignore = ["E501"]
