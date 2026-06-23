@@ -1,7 +1,14 @@
-"""CogniCore Vector Memory module."""
+from .base import MemoryScope, MemoryEntry, SearchResult, MemoryBackend, EmbeddingProvider
 
-from cognicore.memory.vector_memory import VectorMemory
-from cognicore.memory.embedding import EmbeddingMemory
+from .embedding_backend import EmbeddingMemoryBackend
+from .multihop_backend import MultiHopMemoryBackend
 
-__all__ = ["VectorMemory", "EmbeddingMemory"]
-
+__all__ = [
+    "MemoryScope",
+    "MemoryEntry",
+    "SearchResult",
+    "MemoryBackend",
+    "EmbeddingProvider",
+    "EmbeddingMemoryBackend",
+    "MultiHopMemoryBackend"
+]

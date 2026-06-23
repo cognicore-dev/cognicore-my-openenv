@@ -1,6 +1,6 @@
 [project]
 name = "cognicore-env"
-version = "0.9.3"
+version = "0.9.4"
 description = "Runtime cognition layer for AI agents — memory, reflection, replay, and adaptive execution. The model stays the same. The runtime gets smarter."
 readme = "README.md"
 license = {text = "MIT"}
@@ -28,7 +28,7 @@ rl = ["gymnasium>=1.0", "stable-baselines3>=2.0", "torch>=2.0"]
 rendering = ["pygame>=2.5"]
 memory = ["sentence-transformers>=2.0"]
 hf = ["huggingface-hub>=0.20"]
-llm = ["openai>=1.0"]
+llm = ["openai>=1.0", "google-genai>=0.1", "anthropic>=0.30"]
 embeddings = ["sentence-transformers>=2.0", "openai>=1.0"]
 server = ["fastapi>=0.110", "uvicorn>=0.27", "pydantic>=2.0"]
 mcp = ["mcp[cli]>=1.0"]

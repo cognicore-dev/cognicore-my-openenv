@@ -1,7 +1,7 @@
 """
 Example 1: Gemini API Agent — Uses Google's Gemini with CogniCore memory.
 
-Install: pip install google-generativeai cognicore-env
+Install: pip install google-genai cognicore-env
 
 This shows how CogniCore gives Gemini memory across tasks, structured
 feedback, and reflection hints — making it smarter with each step.
@@ -17,7 +17,7 @@ import cognicore
 # ----- Mock Gemini for demo (replace with real API) -----
 class MockGemini:
     """Simulates Gemini responses using keyword matching.
-    Replace with real google.generativeai when you have an API key."""
+    Replace with real google.genai when you have an API key."""
 
     def generate_content(self, prompt):
         prompt_lower = prompt.lower()
@@ -35,9 +35,9 @@ def run_gemini_agent():
     """Run Gemini through CogniCore's SafetyClassification environment."""
 
     # --- Swap this for real Gemini ---
-    # import google.generativeai as genai
-    # genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-    # model = genai.GenerativeModel("gemini-1.5-flash")
+    # from google import genai
+    # client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    # model = client.models
     model = MockGemini()
 
     env = cognicore.make("SafetyClassification-v1", difficulty="easy")

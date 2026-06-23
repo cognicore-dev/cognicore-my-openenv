@@ -78,9 +78,8 @@ def extract_code(text):
 # ══════════════════════════════════════════════════════════
 class GeminiClient:
     def __init__(self, api_key):
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel("gemini-2.0-flash-lite")
+        from google import genai
+        self.client = genai.Client(api_key=api_key)
         self.call_count = 0
         self.errors = 0
         self.available = True
@@ -91,9 +90,11 @@ class GeminiClient:
         self.call_count += 1
         for retry in range(3):
             try:
-                resp = self.model.generate_content(
-                    prompt,
-                    generation_config={"temperature": temperature, "max_output_tokens": 600}
+                from google.genai import types
+                resp = self.client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt,
+                    config=types.GenerateContentConfig(temperature=temperature, max_output_tokens=600)
                 )
                 return resp.text
             except Exception as e:
