@@ -252,8 +252,9 @@ async def ui():
 
 if __name__ == "__main__":
     port = int(os.environ.get("NEXUS_PORT", "8420"))
+    host = os.environ.get("NEXUS_HOST", "127.0.0.1")
     print(f"\n  NEXUS Live Runtime v1.0")
-    print(f"  http://localhost:{port}")
-    print(f"  WebSocket: ws://localhost:{port}/ws\n")
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
+    print(f"  http://{host}:{port}")
+    print(f"  WebSocket: ws://{host}:{port}/ws\n")
+    uvicorn.run(app, host=host, port=port, log_level="warning")
 

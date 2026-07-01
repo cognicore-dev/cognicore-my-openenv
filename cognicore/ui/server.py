@@ -290,13 +290,14 @@ def serve_frontend(path: str = ""):
     return FileResponse(Path(__file__).parent / "frontend" / "index.html")
 
 
-def start_server(port=7842, open_browser=True):
+def start_server(port=7842, open_browser=True, host=None):
     """Start the NEXUS dashboard server."""
     import uvicorn
+    host = host or os.environ.get("NEXUS_HOST", "127.0.0.1")
     print(f"\n  ======================================")
-    print(f"   NEXUS Dashboard -- localhost:{port}")
+    print(f"   NEXUS Dashboard -- {host}:{port}")
     print(f"  ======================================\n")
     if open_browser:
         import threading
         threading.Timer(1.5, lambda: webbrowser.open(f"http://localhost:{port}")).start()
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
+    uvicorn.run(app, host=host, port=port, log_level="warning")
