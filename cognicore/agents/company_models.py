@@ -91,6 +91,8 @@ def _post_json(url: str, payload: bytes, headers: Dict[str, str], timeout: int) 
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"}:
         raise ValueError(f"Unsupported URL scheme: {parsed.scheme or 'missing'}")
+    if not parsed.netloc:
+        raise ValueError("Unsupported URL: missing host")
 
     connection_cls = http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
     path = parsed.path or "/"
