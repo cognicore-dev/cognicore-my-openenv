@@ -14,6 +14,9 @@ All adapters follow the same interface — just pass to cc.train().
 
 from __future__ import annotations
 
+import http.client
+from urllib.parse import urlparse
+
 import json
 import os
 import logging
@@ -82,6 +85,30 @@ def _build_system_prompt(obs: Dict[str, Any]) -> str:
             "You are an AI agent. Analyze the observation and respond with a JSON action. "
             "No explanation, just JSON."
         )
+
+
+def _post_json(url: str, payload: bytes, headers: Dict[str, str], timeout: int) -> Any:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError(f"Unsupported URL scheme: {parsed.scheme or 'missing'}")
+    if not parsed.netloc:
+        raise ValueError("Unsupported URL: missing host")
+
+    connection_cls = http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
+    path = parsed.path or "/"
+    if parsed.query:
+        path = f"{path}?{parsed.query}"
+
+    connection = connection_cls(parsed.netloc, timeout=timeout)
+    try:
+        connection.request("POST", path, body=payload, headers=headers)
+        response = connection.getresponse()
+        body = response.read().decode("utf-8")
+        if response.status >= 400:
+            raise RuntimeError(f"HTTP {response.status}: {body[:200]}")
+        return json.loads(body)
+    finally:
+        connection.close()
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -294,9 +321,6 @@ class OllamaAgent(BaseAgent):
         self.temperature = temperature
 
     def act(self, observation: Dict[str, Any]) -> Dict[str, Any]:
-        import urllib.request
-        import urllib.error
-
         system = _build_system_prompt(observation)
         user_msg = json.dumps(observation, default=str)
 
@@ -310,18 +334,16 @@ class OllamaAgent(BaseAgent):
             "options": {"temperature": self.temperature},
         }).encode("utf-8")
 
-        req = urllib.request.Request(
-            f"{self.host}/api/chat",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-        )
-
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                text = data.get("message", {}).get("content", "")
-                return _extract_json(text)
-        except urllib.error.URLError:
+            data = _post_json(
+                f"{self.host}/api/chat",
+                payload,
+                {"Content-Type": "application/json"},
+                timeout=30,
+            )
+            text = data.get("message", {}).get("content", "")
+            return _extract_json(text)
+        except Exception:
             logger.warning("Ollama not running. Start with: ollama serve")
             return {"action": "UP", "classification": "SAFE"}
 
@@ -350,9 +372,6 @@ class HuggingFaceAgent(BaseAgent):
         self.api_key = api_key or os.environ.get("HF_API_KEY", os.environ.get("HF_TOKEN"))
 
     def act(self, observation: Dict[str, Any]) -> Dict[str, Any]:
-        import urllib.request
-        import urllib.error
-
         system = _build_system_prompt(observation)
         user_msg = json.dumps(observation, default=str)
         prompt = f"[INST] {system}\n\n{user_msg} [/INST]"
@@ -366,21 +385,19 @@ class HuggingFaceAgent(BaseAgent):
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
 
-        req = urllib.request.Request(
-            f"https://api-inference.huggingface.co/models/{self.model}",
-            data=payload,
-            headers=headers,
-        )
-
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                if isinstance(data, list) and data:
-                    text = data[0].get("generated_text", "")
-                else:
-                    text = str(data)
-                return _extract_json(text)
-        except urllib.error.URLError as e:
+            data = _post_json(
+                f"https://api-inference.huggingface.co/models/{self.model}",
+                payload,
+                headers,
+                timeout=30,
+            )
+            if isinstance(data, list) and data:
+                text = data[0].get("generated_text", "")
+            else:
+                text = str(data)
+            return _extract_json(text)
+        except Exception as e:
             logger.warning(f"HuggingFace API error: {e}")
             return {"action": "UP", "classification": "SAFE"}
 
@@ -426,8 +443,6 @@ class OpenAICompatibleAgent(BaseAgent):
         self.max_tokens = max_tokens
 
     def act(self, observation: Dict[str, Any]) -> Dict[str, Any]:
-        import urllib.request
-
         system = _build_system_prompt(observation)
         user_msg = json.dumps(observation, default=str)
 
@@ -441,20 +456,18 @@ class OpenAICompatibleAgent(BaseAgent):
             "max_tokens": self.max_tokens,
         }).encode("utf-8")
 
-        req = urllib.request.Request(
-            f"{self.base_url}/chat/completions",
-            data=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-            },
-        )
-
         try:
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-                text = data["choices"][0]["message"]["content"]
-                return _extract_json(text)
+            data = _post_json(
+                f"{self.base_url}/chat/completions",
+                payload,
+                {
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.api_key}",
+                },
+                timeout=60,
+            )
+            text = data["choices"][0]["message"]["content"]
+            return _extract_json(text)
         except Exception as e:
             logger.warning(f"API error: {e}")
             return {"action": "UP", "classification": "SAFE"}

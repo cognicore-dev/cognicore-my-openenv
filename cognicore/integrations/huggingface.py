@@ -181,6 +181,7 @@ CogniCore provides cognitive RL environments with:
 def download_model(
     repo_id: str,
     algo: str = "PPO",
+    revision: str = "main",
     token: Optional[str] = None,
 ):
     """Download a trained model from HuggingFace Hub.
@@ -198,8 +199,8 @@ def download_model(
     algos = {"PPO": PPO, "DQN": DQN, "A2C": A2C}
     algo_cls = algos.get(algo.upper(), PPO)
 
-    # Download model file
-    model_path = hf_hub_download(repo_id, "model.zip", token=token)
+    # Download model file from an explicit revision for reproducibility.
+    model_path = hf_hub_download(repo_id, "model.zip", revision=revision, token=token)
     model = algo_cls.load(model_path)
 
     logger.info(f"Model loaded from {repo_id}")
