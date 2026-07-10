@@ -67,7 +67,7 @@ class RewardBuilder:
         # 2. Memory bonus — consistency with past successes
         memory_bonus = 0.0
         if cfg.enable_memory and eval_result.correct and eval_result.category and eval_result.category.strip():
-            past = self.memory.retrieve_successes(eval_result.category.strip(), top_k=3)
+            past = self.memory.get_by_category(eval_result.category.strip(), top_k=3, success_filter=True)
             if past:
                 memory_bonus = cfg.memory_bonus_value
 

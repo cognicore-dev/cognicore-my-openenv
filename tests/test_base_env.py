@@ -98,8 +98,8 @@ class TestBaseEnvMiddleware:
         env.step({"answer": 4})
 
         assert len(env.memory.entries) == 1
-        assert env.memory.entries[0]["category"] == "addition"
-        assert env.memory.entries[0]["correct"] is True
+        assert env.memory.entries[0].category == "addition"
+        assert env.memory.entries[0].correct is True
 
     def test_safety_monitor_tracks_streak(self):
         env = MathEnv()

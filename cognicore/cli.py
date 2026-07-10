@@ -134,6 +134,237 @@ def cmd_webhooks(args):
     start_server(port=port, open_browser=False)
 
 
+def cmd_mcp(args):
+    """Start the CogniCore MCP server."""
+    action = getattr(args, 'action', 'serve')
+    if action == 'serve':
+        try:
+            from cognicore.mcp.server import create_mcp_server
+        except ImportError:
+            print("  Error: MCP server requires the 'mcp' package.")
+            print("  Install with: pip install cognicore-env[mcp]")
+            sys.exit(1)
+
+        transport = getattr(args, 'transport', 'stdio')
+        print(f"  Starting CogniCore MCP server (transport={transport})...", file=sys.stderr)
+        server = create_mcp_server()
+        server.run(transport=transport)
+    else:
+        print(f"  Unknown MCP action: {action}")
+
+
+def cmd_bench(args):
+    """Lightweight benchmark suite (no heavy deps)."""
+    from cognicore.benchmarks.suite import BenchmarkSuite
+
+    action = getattr(args, 'action', 'run')
+    if action == 'run':
+        quick = getattr(args, 'quick', False)
+        episodes = getattr(args, 'episodes', 5)
+        seed = getattr(args, 'seed', 42)
+        output = getattr(args, 'output', None)
+
+        suite = BenchmarkSuite(episodes=episodes, seed=seed)
+        print("\n  Running CogniCore benchmarks...")
+        result = suite.run(quick=quick)
+        print(result.summary())
+
+        if output:
+            result.to_json(output)
+            print(f"  Results saved to {output}")
+        else:
+            result.to_json("benchmark_output/latest.json")
+            result.to_csv("benchmark_output/latest.csv")
+            print("  Results saved to benchmark_output/latest.json")
+
+    elif action == 'compare':
+        from cognicore.benchmarks.regression import _cli_main as reg_main
+        reg_main()
+
+    elif action == 'report':
+        import json
+        from pathlib import Path
+        p = Path("benchmark_output/latest.json")
+        if p.exists():
+            data = json.loads(p.read_text())
+            from cognicore.benchmarks.suite import BenchmarkResult
+            # Quick summary from saved data
+            print(f"\n  Last benchmark: {data.get('timestamp', '?')}")
+            print(f"  Version: {data.get('version', '?')}")
+            print(f"  Duration: {data.get('total_duration_s', 0):.1f}s")
+            print(f"  Configs tested: {len(data.get('env_results', []))}")
+        else:
+            print("  No benchmark results found. Run: cognicore bench run")
+
+
+def cmd_doctor(args):
+    """Diagnostic check — verify installation health."""
+    import sys
+    print(f"\n  CogniCore Doctor")
+    print(f"  {'=' * 45}")
+
+    # Python version
+    py = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    ok = sys.version_info >= (3, 9)
+    print(f"  Python {py:20s} {'✓' if ok else '✗ (need 3.9+)'}")
+
+    # CogniCore version
+    try:
+        import cognicore
+        ver = getattr(cognicore, "__version__", "?")
+        print(f"  CogniCore {ver:16s} ✓")
+    except ImportError:
+        print(f"  CogniCore {'not found':16s} ✗")
+        return
+
+    # Optional deps
+    deps = [
+        ("fastapi", "server"),
+        ("uvicorn", "server"),
+        ("mcp", "mcp"),
+        ("langchain", "langchain"),
+        ("crewai", "crewai"),
+        ("gymnasium", "rl"),
+        ("stable_baselines3", "rl"),
+        ("torch", "rl"),
+        ("sentence_transformers", "embeddings"),
+        ("pytest", "dev"),
+    ]
+    print(f"\n  Optional Dependencies:")
+    for mod, group in deps:
+        try:
+            m = __import__(mod)
+            ver = getattr(m, "__version__", "ok")
+            print(f"    {mod:25s} {ver:10s} ✓  [{group}]")
+        except ImportError:
+            print(f"    {mod:25s} {'missing':10s} -  [{group}]")
+
+    # Memory backends
+    print(f"\n  Memory Backends:")
+    backends = [
+        ("TFIDFMemoryBackend", "cognicore.memory.tfidf_backend", "TFIDFMemoryBackend"),
+        ("SQLiteMemoryBackend", "cognicore.memory.sqlite_backend", "SQLiteMemoryBackend"),
+        ("EmbeddingMemoryBackend", "cognicore.memory.embedding_backend", "EmbeddingMemoryBackend"),
+    ]
+    for name, mod, cls_name in backends:
+        try:
+            m = __import__(mod, fromlist=[cls_name])
+            cls = getattr(m, cls_name)
+            if "SQLite" in name:
+                inst = cls(db_path=":memory:")
+            else:
+                inst = cls()
+            print(f"    {name:30s} ✓")
+        except Exception as e:
+            print(f"    {name:30s} ✗ ({e})")
+
+    # Environments
+    try:
+        env_count = len(cognicore.list_envs())
+        print(f"\n  Environments: {env_count} registered ✓")
+    except Exception:
+        print(f"\n  Environments: could not list")
+
+    # Tests
+    import glob
+    test_files = glob.glob("tests/test_*.py")
+    print(f"  Test files: {len(test_files)}")
+
+    print(f"\n  {'=' * 45}")
+    print(f"  Run tests:  pytest tests/ -q")
+    print(f"  Run bench:  cognicore bench run --quick\n")
+
+
+def cmd_sleep(args):
+    """Run memory sleep/consolidation."""
+    from cognicore.memory.tfidf_backend import TFIDFMemoryBackend
+    from cognicore.memory.sqlite_backend import SQLiteMemoryBackend
+    from cognicore.memory.sleep import SleepProcessor
+    import os
+    
+    print("\n  CogniCore Sleep Consolidation")
+    print(f"  {'=' * 45}")
+    
+    if args.backend == "sqlite":
+        db_path = args.db_path or "cognicore_memory.db"
+        print(f"  Using SQLite memory backend at: {db_path}")
+        backend = SQLiteMemoryBackend(db_path=db_path)
+    else:
+        path = args.path or os.path.expanduser("~/.cognicore/memory.json")
+        print(f"  Using TF-IDF memory backend at: {path}")
+        backend = TFIDFMemoryBackend(persistence_path=path)
+        if os.path.exists(path):
+            backend.load(path)
+            
+    processor = SleepProcessor(backend=backend)
+    stats = processor.sleep()
+    
+    print("\n  Consolidation complete:")
+    print(f"    Merged duplicate entries:       {stats.get('merged', 0)}")
+    print(f"    Archived contradictions:        {stats.get('archived_contradictions', 0)}")
+    print(f"    Compressed episodic memories:   {stats.get('compressed_episodes', 0)}")
+    
+    if args.backend == "sqlite":
+        pass
+    else:
+        path = args.path or os.path.expanduser("~/.cognicore/memory.json")
+        backend.save(path)
+        print(f"\n  Saved updated memory to: {path}")
+    print(f"  {'=' * 45}\n")
+
+
+def cmd_passport(args):
+    """Inspect or manage Agent Passports."""
+    from cognicore.passport import AgentPassport
+    import json
+    
+    if args.action == "inspect":
+        print(f"\n  Passport Inspection: {args.file}")
+        print(f"  {'=' * 45}")
+        try:
+            state = AgentPassport.restore(args.file)
+            print(f"  Version: {state.get('manifest', {}).get('version', '?')}")
+            print(f"  Agent:   {state.get('manifest', {}).get('agent_class', '?')}")
+            print(f"  Env:     {state.get('manifest', {}).get('env_class', '?')}")
+            print(f"  Config:  {json.dumps(state.get('manifest', {}).get('config', {}))}")
+            print(f"  Memory Entries: {len(state.get('memory', []))}")
+            print(f"  Replay Events:  {len(state.get('replay', []))}")
+            print(f"  Immune State:   {len(state.get('immune', {}).get('antibodies', []))} antibodies")
+            print(f"  Total Reward:   {sum(state.get('reward', [])):.2f}")
+        except Exception as e:
+            print(f"  Error: {e}")
+    else:
+        print(f"  Unknown passport action: {args.action}")
+
+
+def cmd_civilization(args):
+    """Run a Civilization Server."""
+    from cognicore.civilization import CivilizationServer
+    import time
+    
+    if args.action == "serve":
+        port = args.port
+        print(f"\n  Starting Civilization Server on port {port}...")
+        server = CivilizationServer(port=port)
+        server.start()
+        print(f"  Server running. Press Ctrl+C to stop.")
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print(f"\n  Stopping server...")
+            server.stop()
+    else:
+        print(f"  Unknown civilization action: {args.action}")
+
+
+def cmd_studio(args):
+    """Start the CogniCore Memory Observability Studio."""
+    from cognicore.studio import run_studio
+    port = getattr(args, 'port', 8060)
+    run_studio(port=port)
+
+
 def main():
     p = argparse.ArgumentParser(prog="cognicore")
     sub = p.add_subparsers(dest="command")
@@ -143,7 +374,7 @@ def main():
     t.add_argument("--steps", type=int, default=50000)
     t.add_argument("--eval-episodes", type=int, default=20)
     t.add_argument("--save", default=None)
-    b = sub.add_parser("benchmark", help="Benchmark algos")
+    b = sub.add_parser("benchmark", help="Benchmark algos (requires SB3)")
     b.add_argument("--env", required=True); b.add_argument("--steps", type=int, default=50000)
     a = sub.add_parser("arena", help="ELO tournament")
     a.add_argument("--envs", required=True); a.add_argument("--episodes", type=int, default=20)
@@ -153,10 +384,40 @@ def main():
     i.add_argument("action", nargs="?", default="status", choices=["setup", "test", "status"])
     w = sub.add_parser("webhooks", help="Start webhook server")
     w.add_argument("--port", type=int, default=7842)
+    m = sub.add_parser("mcp", help="MCP server")
+    m.add_argument("action", nargs="?", default="serve", choices=["serve"])
+    m.add_argument("--transport", default="stdio", choices=["stdio", "sse"])
+    # New commands
+    bn = sub.add_parser("bench", help="Lightweight benchmark suite (no heavy deps)")
+    bn.add_argument("action", nargs="?", default="run", choices=["run", "compare", "report"])
+    bn.add_argument("--quick", action="store_true", help="Quick run (easy, 2 episodes)")
+    bn.add_argument("--episodes", type=int, default=5)
+    bn.add_argument("--seed", type=int, default=42)
+    bn.add_argument("--output", type=str, default=None)
+    sub.add_parser("doctor", help="Check installation health")
+    s = sub.add_parser("sleep", help="Run offline memory consolidation (sleep)")
+    s.add_argument("--backend", default="tfidf", choices=["tfidf", "sqlite"])
+    s.add_argument("--path", type=str, default=None, help="Path to TF-IDF json memory file")
+    s.add_argument("--db-path", type=str, default=None, help="Path to SQLite database")
+    
+    pass_cmd = sub.add_parser("passport", help="Inspect Agent Passports")
+    pass_cmd.add_argument("action", choices=["inspect"])
+    pass_cmd.add_argument("file", help="Path to .passport file")
+    
+    civ_cmd = sub.add_parser("civilization", help="Manage Civilization Server")
+    civ_cmd.add_argument("action", choices=["serve"])
+    civ_cmd.add_argument("--port", type=int, default=9876, help="Port to serve on")
+    
+    std_cmd = sub.add_parser("studio", help="Start the Memory Observability Studio")
+    std_cmd.add_argument("--port", type=int, default=8060, help="Port to serve on")
+    
     args = p.parse_args()
     cmds = {"list": cmd_list, "train": cmd_train, "benchmark": cmd_benchmark,
             "arena": cmd_arena, "ui": cmd_ui, "integrations": cmd_integrations,
-            "webhooks": cmd_webhooks}
+            "webhooks": cmd_webhooks, "mcp": cmd_mcp,
+            "bench": cmd_bench, "doctor": cmd_doctor, "sleep": cmd_sleep,
+            "passport": cmd_passport, "civilization": cmd_civilization,
+            "studio": cmd_studio}
     if args.command in cmds:
         cmds[args.command](args)
     else:
@@ -165,3 +426,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

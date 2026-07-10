@@ -106,13 +106,15 @@ class ProposeReviseProtocol:
         self._last_proposed_action = action_str
 
         # Gather feedback
-        memory_context = self.memory.get_context(group_value, top_k=3)
+        memory_context = [
+            e.to_dict() for e in self.memory.get_by_category(group_value, top_k=3)
+        ]
         reflection_hint = self.reflection.get_hint(group_value)
 
         # Estimate confidence from past performance
-        past = self.memory.retrieve(group_value, top_k=10)
+        past = self.memory.get_by_category(group_value, top_k=10)
         if past:
-            correct_count = sum(1 for e in past if e.get("correct"))
+            correct_count = sum(1 for e in past if getattr(e, "correct", False))
             confidence = correct_count / len(past)
         else:
             confidence = 0.5

@@ -8,6 +8,8 @@ from dataclasses import dataclass, field, asdict
 from typing import List, Dict, Optional
 import numpy as np
 
+from cognicore.utils.sqlite import connect_sqlite
+
 DB_DIR = Path.home() / ".cognicore" / "immune"
 DB_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -33,7 +35,7 @@ class ThreatMemory:
         self._init_db()
 
     def _init_db(self):
-        conn = sqlite3.connect(self.db_path)
+        conn = connect_sqlite(self.db_path)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS threats (
                 threat_id TEXT PRIMARY KEY,
@@ -68,7 +70,7 @@ class ThreatMemory:
 
         feat_blob = features.tobytes() if features is not None else b""
 
-        conn = sqlite3.connect(self.db_path)
+        conn = connect_sqlite(self.db_path)
         conn.execute("""
             INSERT OR REPLACE INTO threats
             (threat_id, input_hash, category, action_taken, was_correct,
@@ -84,7 +86,7 @@ class ThreatMemory:
     def get_similar_threats(self, features: np.ndarray,
                            top_k: int = 5) -> List[ThreatRecord]:
         """Find threats with similar feature vectors."""
-        conn = sqlite3.connect(self.db_path)
+        conn = connect_sqlite(self.db_path)
         rows = conn.execute(
             "SELECT * FROM threats WHERE length(features) > 0 "
             "ORDER BY timestamp DESC LIMIT 200"
@@ -111,7 +113,7 @@ class ThreatMemory:
         return [r for _, r in results[:top_k]]
 
     def get_threats_by_category(self, category: str) -> List[ThreatRecord]:
-        conn = sqlite3.connect(self.db_path)
+        conn = connect_sqlite(self.db_path)
         rows = conn.execute(
             "SELECT * FROM threats WHERE category=? ORDER BY timestamp DESC",
             (category,)).fetchall()
@@ -119,7 +121,7 @@ class ThreatMemory:
         return [self._row_to_record(r) for r in rows]
 
     def get_stats(self) -> Dict:
-        conn = sqlite3.connect(self.db_path)
+        conn = connect_sqlite(self.db_path)
         total = conn.execute("SELECT COUNT(*) FROM threats").fetchone()[0]
         blocked = conn.execute(
             "SELECT COUNT(*) FROM threats WHERE action_taken=1").fetchone()[0]
@@ -150,7 +152,7 @@ class ThreatMemory:
             timestamp=row[7], metadata=json.loads(row[8] or "{}"))
 
     def clear(self):
-        conn = sqlite3.connect(self.db_path)
+        conn = connect_sqlite(self.db_path)
         conn.execute("DELETE FROM threats")
         conn.commit()
         conn.close()

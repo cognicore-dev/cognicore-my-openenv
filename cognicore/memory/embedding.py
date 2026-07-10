@@ -14,6 +14,7 @@ import numpy as np
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 from collections import deque
+import threading
 
 logger = logging.getLogger("cognicore.memory.embedding")
 
@@ -40,6 +41,13 @@ class EmbeddingMemory:
         # Returns experiences about walls, even though position is different
     """
 
+
+    def _with_lock(func):
+        def wrapper(self, *args, **kwargs):
+            with self._lock:
+                return func(self, *args, **kwargs)
+        return wrapper
+
     def __init__(
         self,
         model_name: str = "all-MiniLM-L6-v2",
@@ -62,6 +70,7 @@ class EmbeddingMemory:
         self._stores = 0
         self._retrievals = 0
         self._hits = 0
+        self._lock = threading.RLock()
 
     @property
     def model(self):
@@ -79,7 +88,11 @@ class EmbeddingMemory:
         if self.model == "random":
             # Deterministic hash-based embedding as fallback
             np.random.seed(hash(text) % 2**31)
-            return np.random.randn(self.embedding_dim).astype(np.float32)
+            vec = np.random.randn(self.embedding_dim).astype(np.float32)
+            norm = np.linalg.norm(vec)
+            if norm > 0:
+                vec /= norm
+            return vec
         return self.model.encode(text, normalize_embeddings=True)
 
     def _embed_observation(self, obs: Any) -> Tuple[str, np.ndarray]:
@@ -94,6 +107,7 @@ class EmbeddingMemory:
             text = str(obs)
         return text, self._embed(text)
 
+    @_with_lock
     def store(
         self,
         observation: Any,
@@ -123,6 +137,7 @@ class EmbeddingMemory:
         self._texts.append(text)
         self._stores += 1
 
+    @_with_lock
     def retrieve(
         self,
         query: Any,
@@ -156,7 +171,13 @@ class EmbeddingMemory:
         similarities = emb_matrix @ query_emb
 
         # Filter and sort
-        indices = np.argsort(similarities)[::-1][:top_k]
+        if len(similarities) > top_k:
+            indices = np.argpartition(similarities, -top_k)[-top_k:]
+            # Sort just the top k
+            sorted_k = np.argsort(similarities[indices])[::-1]
+            indices = indices[sorted_k]
+        else:
+            indices = np.argsort(similarities)[::-1]
         results = []
         for idx in indices:
             sim = float(similarities[idx])
@@ -170,6 +191,7 @@ class EmbeddingMemory:
 
         return results
 
+    @_with_lock
     def get_advice(self, observation: Any, top_k: int = 3) -> Optional[str]:
         """Get human-readable advice from memory.
 
@@ -208,6 +230,7 @@ class EmbeddingMemory:
             "model": self.model_name,
         }
 
+    @_with_lock
     def clear(self) -> None:
         self._embeddings.clear()
         self._data.clear()
@@ -225,6 +248,13 @@ class CognitiveGymWrapper(gym.Wrapper if 'gym' in dir() else object):
       #   2. Retrieves similar past experiences
       #   3. Adds memory context to info dict
     """
+
+
+    def _with_lock(func):
+        def wrapper(self, *args, **kwargs):
+            with self._lock:
+                return func(self, *args, **kwargs)
+        return wrapper
 
     def __init__(self, env, memory_size: int = 5000, top_k: int = 3):
         try:
@@ -277,7 +307,14 @@ try:
     class CognitiveGymWrapper(gym.Wrapper):
         """Gymnasium wrapper adding embedding-based memory to ANY env."""
 
-        def __init__(self, env, memory_size=5000, top_k=3):
+    
+    def _with_lock(func):
+        def wrapper(self, *args, **kwargs):
+            with self._lock:
+                return func(self, *args, **kwargs)
+        return wrapper
+
+    def __init__(self, env, memory_size=5000, top_k=3):
             super().__init__(env)
             self.memory = EmbeddingMemory(max_size=memory_size)
             self.top_k = top_k

@@ -9,6 +9,8 @@ from enum import Enum
 from typing import Optional, Dict, List, Callable
 from dataclasses import dataclass, field, asdict
 
+from cognicore.utils.sqlite import connect_sqlite
+
 DB_PATH = Path.home() / ".cognicore" / "task_queue.db"
 DB_PATH.parent.mkdir(exist_ok=True)
 
@@ -114,10 +116,10 @@ class NexusTaskQueue:
     def _conn(self):
         if self.db_path == ":memory:":
             if self._persistent_conn is None:
-                self._persistent_conn = sqlite3.connect(":memory:")
+                self._persistent_conn = sqlite3.connect(":memory:", timeout=30.0)
                 self._persistent_conn.row_factory = sqlite3.Row
             return self._persistent_conn
-        db = sqlite3.connect(self.db_path)
+        db = connect_sqlite(self.db_path)
         db.row_factory = sqlite3.Row
         return db
 

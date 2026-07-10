@@ -166,7 +166,7 @@ class TestSafetyEnvCognitiveFeatures:
 
         # Start second episode — observations should have memory
         obs = env.reset()
-        if obs.get("category") and env.memory.has_seen_group(obs.get("category", "")):
+        if obs.get("category") and len(env.memory.get_by_category(obs.get("category", ""), top_k=1)) > 0:
             assert "memory_context" in obs
 
     def test_safety_monitor_streak(self):

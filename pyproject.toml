@@ -1,10 +1,10 @@
 [project]
 name = "cognicore-env"
-version = "0.9.4"
+version = "0.9.5"
 description = "Runtime cognition layer for AI agents — memory, reflection, replay, and adaptive execution. The model stays the same. The runtime gets smarter."
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
     {name = "CogniCore Team"},
 ]
@@ -15,13 +15,15 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-dependencies = []
+dependencies = [
+    "numpy>=1.20.0",
+    "jsonschema>=4.0.0",
+]
 
 [project.optional-dependencies]
 rl = ["gymnasium>=1.0", "stable-baselines3>=2.0", "torch>=2.0"]
@@ -35,9 +37,15 @@ mcp = ["mcp[cli]>=1.0"]
 langchain = ["langchain>=0.2"]
 crewai = ["crewai>=0.50"]
 openai-agents = ["openai-agents>=0.1"]
-dev = ["pytest>=7.0", "pytest-cov>=4.0", "httpx>=0.27"]
+memory-providers = [
+    "mem0ai>=2.0",
+    "mempalace>=3.5",
+    "zep-cloud>=3.23",
+    "supermemory>=3.50",
+]
+dev = ["pytest>=7.0", "pytest-cov>=4.0", "pytest-xdist>=3.0", "httpx>=0.27"]
 all = [
-    "cognicore[rl,rendering,memory,hf,llm,embeddings,server,mcp,langchain,crewai,openai-agents,dev]"
+    "cognicore-env[rl,rendering,memory,hf,llm,embeddings,server,mcp,langchain,crewai,openai-agents,memory-providers,dev]"
 ]
 
 [project.urls]

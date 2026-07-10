@@ -10,6 +10,7 @@ from typing import List, Optional
 import numpy as np
 
 from cognicore.replay.recorder import AgentEvent
+from cognicore.utils.sqlite import connect_sqlite
 
 DB_DIR = Path.home() / ".cognicore" / "replay"
 DB_DIR.mkdir(parents=True, exist_ok=True)
@@ -24,7 +25,6 @@ class EventStore:
 
     def _init_db(self):
         conn = self._conn()
-        conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS events (
                 event_id TEXT PRIMARY KEY,
@@ -85,7 +85,7 @@ class EventStore:
         conn.close()
 
     def _conn(self):
-        return sqlite3.connect(self.db_path)
+        return connect_sqlite(self.db_path)
 
     def save_event(self, event: AgentEvent):
         """Persist a single event."""

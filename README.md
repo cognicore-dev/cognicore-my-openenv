@@ -6,8 +6,26 @@
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue)](https://pypi.org/project/cognicore-env/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-CogniCore adds **memory, reflection, and adaptive execution** to any AI agent.
-Your agent remembers what failed, retrieves relevant context, and changes strategy — without changing the model.
+CogniCore is an advanced, unopinionated framework for designing, simulating, and evaluating cognitive agents in reinforcement learning (RL) and federated environments. Built entirely on standard Python and NumPy, CogniCore is extremely lightweight and focuses on providing modular abstractions for high-level agent cognition.
+
+## The Living Agent Stack (v1.0.0)
+
+With the release of version 1.0.0, CogniCore introduces the **Living Agent Stack**, a suite of 7 groundbreaking modules designed to grant agents unprecedented autonomy, self-awareness, and sociability:
+
+1. **AgentPassport (`cognicore.passport`)**: Universal serialization wrapper to seamlessly package, diff, and transport agents across instances, environments, or networks.
+2. **AgentDNA (`cognicore.dna`)**: A behavioral genome extractor that distills an agent's history into traits (e.g., risk tolerance, exploration rate) and supports evolutionary algorithms (crossover, mutation).
+3. **Conscience (`cognicore.conscience`)**: A real-time self-auditing wrapper that intercepts actions to evaluate uncertainty, novelty, and consequences, holding or escalating risky decisions.
+4. **Civilization (`cognicore.civilization`)**: A federated learning protocol allowing agents to share abstract behavioral insights (failure modes, strategies) without leaking raw observations or prompts.
+5. **TimeTraveler (`cognicore.timetravel`)**: A debugging and counterfactual engine that lets agents rewind state, branch alternative actions, and compare timelines.
+6. **Oracle (`cognicore.oracle`)**: A predictive simulation wrapper that uses environment models to foresee outcomes, evaluate risks, and explain planned trajectories.
+7. **DreamEngine (`cognicore.dream`)**: Generates synthetic experiences (dreams), adversarial edge-cases (nightmares), and hallucinates goal-directed action sequences.
+
+## Existing Modules (v0.9.1)
+- **cognicore.immune**: Biological-inspired safety components (NexusShield, ThreatDetector, AntibodyStore, Quarantine, RLDefender).
+- **cognicore.replay**: Event stores, task replayers, branch comparators, trajectory exporters, and timeline visualizers.
+- **cognicore.memory**: Graph, SQLite, and TF-IDF memory backends.
+
+## Philosophy
 
 ```bash
 pip install cognicore-env
@@ -210,6 +228,7 @@ cognicore benchmark                     # Benchmark algorithms
 cognicore arena                         # ELO tournament
 cognicore ui                            # Start NEXUS dashboard
 cognicore integrations                  # Manage integrations
+cognicore studio                        # Start Memory Observability Studio
 ```
 
 > **Note:** The CLI is available after `pip install -e .` (editable install) or `pip install cognicore-env`.

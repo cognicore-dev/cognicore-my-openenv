@@ -353,7 +353,7 @@ class AIDebugger:
                     info=info,
                     breakpoint_name=triggered_bp.name,
                     memory_state={
-                        "total_entries": env.memory.stats().get("total_entries", 0)
+                        "total_entries": len(env.memory.entries)
                     },
                 )
                 trace.add_snapshot(snapshot)

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, Tuple
 
-from cognicore.middleware.memory import Memory
+from cognicore.memory.base import MemoryBackend
 
 
 class ReflectionEngine:
@@ -36,7 +36,7 @@ class ReflectionEngine:
 
     def __init__(
         self,
-        memory: Memory,
+        memory: MemoryBackend,
         min_samples: int = 2,
         failure_threshold: int = 2,
     ) -> None:
@@ -60,7 +60,7 @@ class ReflectionEngine:
             Keys: ``n_similar``, ``good_predictions``, ``bad_predictions``,
             ``recommendation``.
         """
-        entries = self.memory.retrieve(group_value, top_k=50)
+        entries = self.memory.get_by_category(category=group_value, top_k=50)
 
         if not entries:
             return {
@@ -75,11 +75,11 @@ class ReflectionEngine:
 
         for entry in entries:
             # Use predicted, fall back to action, else empty string
-            predicted = str(entry.get("predicted") or entry.get("action") or "").strip()
+            predicted = str(entry.action or "").strip()
             
-            if entry.get("correct") is True:
+            if entry.correct is True:
                 good[predicted] = good.get(predicted, 0) + 1
-            elif entry.get("correct") is False:
+            elif entry.correct is False:
                 bad[predicted] = bad.get(predicted, 0) + 1
 
         # Filter out empty string from good predictions before recommending

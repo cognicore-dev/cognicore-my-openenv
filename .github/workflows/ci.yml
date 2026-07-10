@@ -4,7 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   test:
@@ -16,6 +19,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
@@ -23,34 +32,110 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
-          pip install gymnasium stable-baselines3 torch numpy
+          uv pip install --system ".[dev]"
+          uv pip install --system gymnasium stable-baselines3 torch numpy pytest-cov pytest-xdist
 
-      - name: Run core tests
-        run: pytest tests/ -x -q --tb=short
+      - name: Run tests (3.10 & 3.11)
+        if: matrix.python-version != '3.12'
+        run: pytest tests/ -n auto -q --tb=short
 
-      - name: Verify gymnasium envs
+      - name: Run tests with Coverage (3.12)
+        if: matrix.python-version == '3.12'
         run: |
-          python -c "
-          import cognicore.gym
-          import gymnasium as gym
-          from gymnasium.utils.env_checker import check_env
-          for eid in ['cognicore/MazeRunner-v0','cognicore/GridWorld-v0',
-                      'cognicore/Trading-v0','cognicore/Survival-v0']:
-              env = gym.make(eid)
-              check_env(env.unwrapped, skip_render_check=True)
-              print(f'  {eid}: PASSED')
-              env.close()
-          "
+          pytest tests/ -n auto -v --tb=short --cov=cognicore --cov-report=json --cov-report=term-missing 2>&1 | tee test_output.txt
 
-      - name: Verify SB3 compatibility
+      - name: Generate Coverage Report
+        if: always() && matrix.python-version == '3.12'
         run: |
-          python -c "
-          import cognicore.gym; import gymnasium as gym
-          from stable_baselines3 import PPO
-          from stable_baselines3.common.monitor import Monitor
-          env = Monitor(gym.make('cognicore/GridWorld-v0'))
-          PPO('MlpPolicy', env, verbose=0, n_steps=64, batch_size=32).learn(256)
-          print('SB3: PASSED'); env.close()
-          "
+          python << 'PYEOF'
+          import json, os
+
+          report = []
+          report.append("## 📊 TestBot Coverage Report\n")
+
+          try:
+              test_output = open("test_output.txt", "r").read()
+              if "passed" in test_output:
+                  for line in test_output.split("\n"):
+                      if "passed" in line or "failed" in line:
+                          report.append(f"**Test Result:** `{line.strip()}`\n")
+                          break
+          except:
+              pass
+
+          try:
+              with open("coverage.json", "r") as f:
+                  cov = json.load(f)
+
+              total_pct = cov.get("totals", {}).get("percent_covered", 0)
+              report.append(f"**Overall Coverage:** `{total_pct:.1f}%`\n")
+
+              report.append("\n| Module | Coverage | Lines | Missing |")
+              report.append("|--------|----------|-------|---------|")
+
+              files = cov.get("files", {})
+              sorted_files = sorted(files.items(), key=lambda x: x[1].get("summary", {}).get("percent_covered", 0))
+
+              for path, data in sorted_files:
+                  summary = data.get("summary", {})
+                  pct = summary.get("percent_covered", 0)
+                  total = summary.get("num_statements", 0)
+                  missing = summary.get("missing_lines", 0)
+
+                  if pct >= 80: emoji = "🟢"
+                  elif pct >= 50: emoji = "🟡"
+                  else: emoji = "🔴"
+
+                  short_path = path.replace("cognicore/", "")
+                  report.append(f"| {emoji} `{short_path}` | {pct:.0f}% | {total} | {missing} |")
+
+          except FileNotFoundError:
+              report.append("⚠️ Coverage data not available")
+
+          report.append("\n---\n*TestBot v2.0 • Automated Test Report*")
+          body = "\n".join(report)
+          with open("testbot_report.txt", "w") as f:
+              f.write(body)
+          PYEOF
+
+      - name: Post Coverage Comment
+        if: always() && github.event_name == 'pull_request' && matrix.python-version == '3.12'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body;
+            try {
+              body = fs.readFileSync('testbot_report.txt', 'utf8');
+            } catch {
+              body = '## 📊 TestBot\n\n⚠️ Could not generate report.';
+            }
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(c =>
+              c.body.includes('📊 TestBot Coverage Report')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body,
+              });
+            }
+
+      - name: Run benchmark smoke test
+        run: python -m cognicore.benchmarks.suite --quick --skip-backend

@@ -9,10 +9,11 @@ from cognicore.replay.comparator import BranchComparator, Comparison
 from cognicore.replay.rl_navigator import RLNavigator, BranchDecision
 from cognicore.replay.visualizer import TimelineVisualizer
 from cognicore.replay.exporter import TrajectoryExporter
+from cognicore.replay.session import SessionRecorder, replay
 
 __all__ = [
     "EventRecorder", "AgentEvent", "EventType", "EventStore",
     "TaskReplayer", "ReplaySession", "TaskBrancher", "Branch",
     "BranchComparator", "Comparison", "RLNavigator", "BranchDecision",
-    "TimelineVisualizer", "TrajectoryExporter",
+    "TimelineVisualizer", "TrajectoryExporter", "SessionRecorder", "replay"
 ]

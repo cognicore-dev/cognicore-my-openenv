@@ -1,6 +1,6 @@
 from .base import MemoryScope, MemoryEntry, SearchResult, MemoryBackend, EmbeddingProvider
 
-from .embedding_backend import EmbeddingMemoryBackend
+from .embedding_backend import BasicEmbeddingBackend
 from .multihop_backend import MultiHopMemoryBackend
 
 __all__ = [
@@ -9,6 +9,6 @@ __all__ = [
     "SearchResult",
     "MemoryBackend",
     "EmbeddingProvider",
-    "EmbeddingMemoryBackend",
+    "BasicEmbeddingBackend",
     "MultiHopMemoryBackend"
 ]

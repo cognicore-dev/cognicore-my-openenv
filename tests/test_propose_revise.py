@@ -2,14 +2,15 @@
 
 import pytest
 
-from cognicore.middleware.memory import Memory
+from cognicore.memory.tfidf_backend import TFIDFMemoryBackend
+from cognicore.memory.base import MemoryEntry
 from cognicore.middleware.reflection import ReflectionEngine
 from cognicore.middleware.propose_revise import ProposeReviseProtocol
 
 
 class TestProposeRevise:
     def _make_protocol(self, max_proposals=1):
-        mem = Memory()
+        mem = TFIDFMemoryBackend()
         refl = ReflectionEngine(mem)
         return ProposeReviseProtocol(mem, refl, max_proposals=max_proposals)
 
@@ -85,11 +86,11 @@ class TestProposeRevise:
         assert stats["total_improvements"] == 1
 
     def test_confidence_estimate_with_history(self):
-        mem = Memory()
+        mem = TFIDFMemoryBackend()
         # Simulate past entries
-        mem.store({"category": "math", "correct": True, "predicted": "42"})
-        mem.store({"category": "math", "correct": True, "predicted": "42"})
-        mem.store({"category": "math", "correct": False, "predicted": "99"})
+        mem.store(MemoryEntry(text="", category="math", correct=True, action="42"))
+        mem.store(MemoryEntry(text="", category="math", correct=True, action="42"))
+        mem.store(MemoryEntry(text="", category="math", correct=False, action="99"))
 
         refl = ReflectionEngine(mem)
         pr = ProposeReviseProtocol(mem, refl)

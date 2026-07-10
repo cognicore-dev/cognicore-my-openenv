@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from cognicore.nexus.trajectory_store import TrajectoryStore
 from cognicore.research.persistent_store import PersistentCognitionStore
 from cognicore.nexus.token_tracker import TokenTracker
+from cognicore.utils.sqlite import connect_sqlite
 
 NEXUS_DIR = Path.home() / ".cognicore"
 NEXUS_DIR.mkdir(exist_ok=True)
@@ -76,7 +77,7 @@ async def watch_events():
 
 # ── Database ──
 def get_db():
-    db = sqlite3.connect(str(DB_PATH))
+    db = connect_sqlite(DB_PATH)
     db.row_factory = sqlite3.Row
     db.execute("""CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY, value TEXT
@@ -241,9 +242,9 @@ def get_analytics():
 
 @app.get("/api/settings")
 def get_settings():
-    db = get_db()
-    rows = db.execute("SELECT key, value FROM settings").fetchall()
-    settings = {r["key"]: r["value"] for r in rows}
+    with get_db() as db:
+        rows = db.execute("SELECT key, value FROM settings").fetchall()
+        settings = {r["key"]: r["value"] for r in rows}
     return {
         "default_policy": settings.get("default_policy", "test_first"),
         "max_tokens": int(settings.get("max_tokens", "1000000")),
@@ -256,12 +257,12 @@ def get_settings():
 
 @app.post("/api/settings")
 def update_settings(data: dict):
-    db = get_db()
-    for k, v in data.items():
-        if k in ("default_policy", "max_tokens", "budget_usd", "port"):
-            db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-                      (k, str(v)))
-    db.commit()
+    with get_db() as db:
+        for k, v in data.items():
+            if k in ("default_policy", "max_tokens", "budget_usd", "port"):
+                db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                          (k, str(v)))
+        db.commit()
     return {"ok": True}
 
 @app.post("/api/events")

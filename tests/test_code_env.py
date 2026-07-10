@@ -82,8 +82,8 @@ class TestCodeEnvBasics:
         env.step({"bug_line": 2, "fix_type": "wrong_operator"})
         env.step({"bug_line": 2, "fix_type": "syntax_error"})
         assert len(env.memory.entries) == 2
-        groups = env.memory.stats()["groups"]
-        assert "operator_error" in groups or "syntax" in groups
+        categories = {e.category for e in env.memory.entries}
+        assert "operator_error" in categories or "syntax" in categories
 
 
 class TestCodeGrading:

@@ -66,8 +66,18 @@ from cognicore.agents.company_models import (
 # Core Features
 from cognicore.core.cognitive_boost import CognitiveBoost, Arena, AutoCurriculum, TransferAgent
 
+# Memory Architecture
+from cognicore.memory.base import (
+    MemoryScope,
+    MemoryEntry,
+    SearchResult,
+    MemoryBackend,
+    EmbeddingProvider,
+)
+from cognicore.memory.tfidf_backend import TFIDFMemoryBackend
+from cognicore.memory.tfidf_embedder import TFIDFEmbeddingProvider
+
 # Middleware (importable for custom usage)
-from cognicore.middleware.memory import Memory
 from cognicore.middleware.reflection import ReflectionEngine
 from cognicore.middleware.safety_monitor import SafetyMonitor
 

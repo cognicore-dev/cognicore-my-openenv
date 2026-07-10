@@ -36,7 +36,9 @@ from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from cognicore.middleware.memory import Memory
+from cognicore.memory.base import MemoryBackend, MemoryScope
+from cognicore.memory.tfidf_backend import TFIDFMemoryBackend
+from cognicore.memory.lifecycle import MemoryLifecycleManager
 from cognicore.middleware.reflection import ReflectionEngine
 
 logger = logging.getLogger("cognicore.runtime")
@@ -59,6 +61,12 @@ class RuntimeConfig:
     persistence_path: Optional[str] = None
     auto_save: bool = True
     verbose: bool = False
+    
+    # Phase 0/1/3 Additions
+    memory_backend: Optional[str] = "tfidf"  # "tfidf", "sqlite", "embeddings"
+    embedding_provider: Optional[str] = None
+    memory_scope: str = "global"
+    memory_scope_id: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -153,17 +161,24 @@ class CogniCoreRuntime:
         self,
         config: Optional[RuntimeConfig] = None,
         name: str = "cognicore-runtime",
+        memory: Optional[MemoryBackend] = None,
     ) -> None:
         self.config = config or RuntimeConfig()
         self.name = name
 
         # Initialize middleware
-        self.memory = Memory(
-            max_size=self.config.memory_max_size,
-            similarity_key=self.config.memory_similarity_key,
-        )
+        if memory is not None:
+            self.backend = memory
+        else:
+            self.backend = TFIDFMemoryBackend(
+                max_size=self.config.memory_max_size,
+                persistence_path=self.config.persistence_path
+            )
+            
+        self.memory = MemoryLifecycleManager(backend=self.backend)
+
         self.reflection = ReflectionEngine(
-            memory=self.memory,
+            memory=self.backend,
             min_samples=self.config.reflection_min_samples,
             failure_threshold=self.config.reflection_failure_threshold,
         )
@@ -221,7 +236,7 @@ class CogniCoreRuntime:
         self.stats.categories_seen = len(self._categories)
 
         # Build context from memory + reflection
-        context = self._build_context(category)
+        context = self._build_context(category, task=task)
 
         # Try execution with retries
         for attempt in range(1, max_retries + 2):
@@ -284,15 +299,27 @@ class CogniCoreRuntime:
 
         # Store in memory
         if self.config.enable_memory:
-            self.memory.store({
-                self.config.memory_similarity_key: category,
-                "predicted": str(result.output)[:500],
-                "correct": result.success,
-                "task": str(task)[:200],
-                "duration_ms": result.duration_ms,
-                "attempt": attempt,
-                "error": result.error,
-            })
+            from cognicore.memory.base import MemoryEntry
+            scope_val = MemoryScope.GLOBAL
+            try:
+                scope_val = MemoryScope(self.config.memory_scope)
+            except ValueError:
+                pass
+                
+            entry = MemoryEntry(
+                text=str(task)[:200],
+                category=category,
+                action=str(result.output)[:500],
+                correct=result.success,
+                scope=scope_val,
+                scope_id=self.config.memory_scope_id,
+                metadata={
+                    "duration_ms": result.duration_ms,
+                    "attempt": attempt,
+                    "error": result.error,
+                }
+            )
+            self.memory.store_direct(entry)
 
         # Log execution
         self._execution_log.append(result.to_dict())
@@ -304,7 +331,7 @@ class CogniCoreRuntime:
 
         return result
 
-    def _build_context(self, category: str) -> Dict[str, Any]:
+    def _build_context(self, category: str, task: Any = None) -> Dict[str, Any]:
         """Build cognition context from memory + reflection."""
         context: Dict[str, Any] = {
             "memory": [],
@@ -315,18 +342,30 @@ class CogniCoreRuntime:
         }
 
         if self.config.enable_memory:
-            context["memory"] = self.memory.get_context(
-                category, top_k=self.config.memory_top_k
-            )
+            if task:
+                results = self.memory.retrieve(
+                    query=str(task),
+                    task=category,
+                    top_k=self.config.memory_top_k
+                )
+                context["memory"] = [r.entry.to_dict() for r in results]
+                self.stats.memory_retrievals += len(results)
+            else:
+                context["memory"] = [
+                    e.to_dict() for e in self.backend.get_by_category(
+                        category, top_k=self.config.memory_top_k
+                    )
+                ]
+                self.stats.memory_retrievals += 1
+
             context["failures_to_avoid"] = [
-                str(e.get("predicted", ""))
-                for e in self.memory.retrieve_failures(category, top_k=5)
+                e.action
+                for e in self.backend.get_by_category(category, top_k=5, success_filter=False)
             ]
             context["successful_patterns"] = [
-                str(e.get("predicted", ""))
-                for e in self.memory.retrieve_successes(category, top_k=5)
+                e.action
+                for e in self.backend.get_by_category(category, top_k=5, success_filter=True)
             ]
-            self.stats.memory_retrievals += 1
 
             # Check if we're about to repeat a known failure
             if context["failures_to_avoid"]:
@@ -376,16 +415,17 @@ class CogniCoreRuntime:
         """Get comprehensive runtime statistics."""
         return {
             "runtime": self.stats.to_dict(),
-            "memory": self.memory.stats(),
+            "memory": self.backend.stats(),
             "reflection": self.reflection.stats(),
+            "lifecycle": self.memory.get_health_report()
         }
 
     def get_failure_report(self) -> Dict[str, Any]:
         """Get detailed failure analysis per category."""
         report = {}
         for cat in self._categories:
-            failures = self.memory.retrieve_failures(cat, top_k=50)
-            successes = self.memory.retrieve_successes(cat, top_k=50)
+            failures = self.backend.get_by_category(cat, top_k=50, success_filter=False)
+            successes = self.backend.get_by_category(cat, top_k=50, success_filter=True)
             analysis = self.reflection.analyze(cat)
             report[cat] = {
                 "total_failures": len(failures),
@@ -404,7 +444,9 @@ class CogniCoreRuntime:
     def _save_state(self):
         path = Path(self.config.persistence_path)
         path.mkdir(parents=True, exist_ok=True)
-        self.memory.save(path / f"{self.name}_memory.json")
+        if hasattr(self.backend, "persistence_path"):
+            self.backend.persistence_path = str(path / f"{self.name}_memory.json")
+        self.backend.save()
         # Save stats
         stats_path = path / f"{self.name}_stats.json"
         stats_path.write_text(json.dumps(self.stats.to_dict(), indent=2))
@@ -413,8 +455,8 @@ class CogniCoreRuntime:
         path = Path(self.config.persistence_path)
         mem_path = path / f"{self.name}_memory.json"
         if mem_path.exists():
-            self.memory.load(mem_path)
-            logger.info(f"Loaded {len(self.memory.entries)} memory entries")
+            self.backend.load(mem_path)
+            logger.info(f"Loaded {len(self.backend.entries)} memory entries")
 
     def save(self, path: Optional[str] = None):
         """Manually save runtime state."""
@@ -425,7 +467,7 @@ class CogniCoreRuntime:
 
     def reset(self):
         """Reset all runtime state."""
-        self.memory.clear()
+        self.backend.clear()
         self.stats = RuntimeStats()
         self._categories.clear()
         self._execution_log.clear()

@@ -65,6 +65,42 @@ class MultiHopMemoryBackend(MemoryBackend):
         self.entries.clear()
         self.is_index_dirty = True
 
+    def _get_all_entries(self) -> List[MemoryEntry]:
+        """Override base class dict iteration bug to return values instead of keys."""
+        return list(self.entries.values())
+
+    def save(self) -> None:
+        import json
+        from pathlib import Path
+        if not hasattr(self, "persistence_path") or not self.persistence_path:
+            return
+        try:
+            path = Path(self.persistence_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            data = {"entries": [e.to_dict() for e in self.entries.values()]}
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception(f"Failed to save MultiHopMemory: {e}")
+
+    def load(self) -> None:
+        import json
+        from pathlib import Path
+        if not hasattr(self, "persistence_path") or not self.persistence_path:
+            return
+        path = Path(self.persistence_path)
+        if not path.exists():
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self.entries = {e.get("entry_id"): MemoryEntry.from_dict(e) for e in data.get("entries", [])}
+            self.is_index_dirty = True
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception(f"Failed to load MultiHopMemory: {e}")
+
     def get_by_category(self, category: str, top_k: int = 5, success_filter: Optional[bool] = None) -> List[MemoryEntry]:
         results = []
         for e in self.entries.values():

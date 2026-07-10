@@ -301,10 +301,32 @@ class CognicoreMultiHopAdapter(BaseAgentAdapter):
                 
         retrieved_memories = [self.chunks[idx].text for idx in final_top_k]
         
+        # --- F. Generate Answer using LLM ---
+        from cognicore_benchmarks.common.llm_client import LLMClient
+        model_name = os.environ.get("COGNICORE_EVAL_MODEL", "gemini-3.1-pro-preview")
+        client = LLMClient(model_name=model_name)
+        
+        context_text = "\n\n".join(retrieved_memories)
+        prompt = (
+            f"Here is the retrieved conversation history:\n\n"
+            f"{context_text}\n\n"
+            f"Based on the history above, please answer the following question. "
+            f"If the information is not in the history, say 'I don't know'.\n\n"
+            f"Question: {question}"
+        )
+        system_prompt = "You are a helpful assistant evaluating a conversation log."
+        
+        result = client.generate(prompt=prompt, system_prompt=system_prompt)
+        
+        answer = result.get("content", "")
+        if not answer or "error" in result:
+            # Fallback when no API key is available
+            answer = f"[RAW_RETRIEVAL_FALLBACK]\n{context_text}"
+            
         return {
-            "answer": "N/A - Multi-Hop Local Eval",
-            "latency_s": 0.0,
-            "tokens": 0,
+            "answer": answer,
+            "latency_s": result.get("latency_s", 0),
+            "tokens": result.get("prompt_tokens", 0) + result.get("completion_tokens", 0),
             "retrieved_memories": retrieved_memories,
             "ranking_scores": [chunk_score_map[idx] for idx in final_top_k]
         }

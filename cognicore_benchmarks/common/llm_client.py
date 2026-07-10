@@ -24,7 +24,9 @@ class LLMClient:
         gemini_key = os.getenv("GEMINI_API_KEY")
         
         try:
-            if groq_key:
+            if "gemini" in self.model_name.lower() and gemini_key:
+                self.client_type = "gemini"
+            elif groq_key:
                 self.client = openai.OpenAI(
                     base_url="https://api.groq.com/openai/v1",
                     api_key=groq_key,
@@ -46,7 +48,14 @@ class LLMClient:
                 elif self.model_name.startswith("google/"):
                     self.model_name = self.model_name.split("/", 1)[1]
             else:
-                self.client = openai.OpenAI()
+                openai_key = os.getenv("OPENAI_API_KEY")
+                base_url = os.getenv("OPENAI_BASE_URL")
+                kwargs = {}
+                if openai_key:
+                    kwargs["api_key"] = openai_key
+                if base_url:
+                    kwargs["base_url"] = base_url
+                self.client = openai.OpenAI(**kwargs)
         except Exception:
             print("No valid API Key found. Using MOCK LLM Client.")
             self.is_mock = True

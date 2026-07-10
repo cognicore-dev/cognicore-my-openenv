@@ -1,7 +1,8 @@
 """Tests for CogniCore StructuredReward and RewardBuilder."""
 
 from cognicore.core.types import CogniCoreConfig, EvalResult, StructuredReward
-from cognicore.middleware.memory import Memory
+from cognicore.memory.tfidf_backend import TFIDFMemoryBackend
+from cognicore.memory.base import MemoryEntry
 from cognicore.middleware.rewards import RewardBuilder
 
 
@@ -49,7 +50,7 @@ class TestRewardBuilder:
 
     def test_base_score_only(self):
         config = CogniCoreConfig(enable_memory=False, enable_reflection=False)
-        mem = Memory()
+        mem = TFIDFMemoryBackend()
         builder = RewardBuilder(config, mem)
 
         result = EvalResult(base_score=1.0, correct=True, category="math")
@@ -61,9 +62,9 @@ class TestRewardBuilder:
 
     def test_memory_bonus(self):
         config = CogniCoreConfig(enable_memory=True, memory_bonus_value=0.05)
-        mem = Memory()
+        mem = TFIDFMemoryBackend()
         # Store a success for this category
-        mem.store({"category": "math", "correct": True, "predicted": "42"})
+        mem.store(MemoryEntry(text="", category="math", correct=True, action="42"))
 
         builder = RewardBuilder(config, mem)
         result = EvalResult(
@@ -75,8 +76,8 @@ class TestRewardBuilder:
 
     def test_no_memory_bonus_when_wrong(self):
         config = CogniCoreConfig(enable_memory=True)
-        mem = Memory()
-        mem.store({"category": "math", "correct": True, "predicted": "42"})
+        mem = TFIDFMemoryBackend()
+        mem.store(MemoryEntry(text="", category="math", correct=True, action="42"))
 
         builder = RewardBuilder(config, mem)
         result = EvalResult(
@@ -88,7 +89,7 @@ class TestRewardBuilder:
 
     def test_streak_penalty_passthrough(self):
         config = CogniCoreConfig()
-        mem = Memory()
+        mem = TFIDFMemoryBackend()
         builder = RewardBuilder(config, mem)
 
         result = EvalResult(base_score=0.0, correct=False, category="x")
@@ -98,7 +99,7 @@ class TestRewardBuilder:
 
     def test_novelty_bonus(self):
         config = CogniCoreConfig(novelty_bonus_value=0.04)
-        mem = Memory()
+        mem = TFIDFMemoryBackend()
         builder = RewardBuilder(config, mem)
 
         result = EvalResult(base_score=1.0, correct=True, category="new")
@@ -108,7 +109,7 @@ class TestRewardBuilder:
 
     def test_confidence_calibration_correct(self):
         config = CogniCoreConfig(confidence_bonus_scale=0.02)
-        mem = Memory()
+        mem = TFIDFMemoryBackend()
         builder = RewardBuilder(config, mem)
 
         result = EvalResult(base_score=1.0, correct=True, category="x")
@@ -118,7 +119,7 @@ class TestRewardBuilder:
 
     def test_confidence_calibration_wrong(self):
         config = CogniCoreConfig(confidence_bonus_scale=0.02)
-        mem = Memory()
+        mem = TFIDFMemoryBackend()
         builder = RewardBuilder(config, mem)
 
         result = EvalResult(base_score=0.0, correct=False, category="x")

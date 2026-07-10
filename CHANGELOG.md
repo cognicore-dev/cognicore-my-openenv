@@ -1,9 +1,135 @@
 # Changelog
 
-All notable changes to CogniCore are documented here.
+## [1.0.0] - 2026-07-06
+
+### Added
+- **AgentPassport (`cognicore.passport`)**: Universal serialization wrapper (zip/json/npz) for packaging agents.
+- **AgentDNA (`cognicore.dna`)**: Behavioral genome extraction and evolutionary algorithms with SVG visualization.
+- **Conscience (`cognicore.conscience`)**: Real-time self-auditing, uncertainty detection, and decision holding.
+- **Civilization (`cognicore.civilization`)**: Federated agent behavioral knowledge sharing and server node.
+- **TimeTraveler (`cognicore.timetravel`)**: State rewinding, counterfactual branching, and timeline comparison.
+- **Oracle (`cognicore.oracle`)**: Predictive simulation, adversarial search, and goal-directed hallucinations via environment models.
+- **DreamEngine (`cognicore.dream`)**: Synthetic experience generation, adversarial nightmares, and hallucinatory rollouts.
+- **CLI Enhancements**: Added `passport` and `civilization` management commands to the central CLI.
+
+### Changed
+- Refactored core modules to prepare for the "Living Agent Stack".
+
+
+All notable changes to CogniCore NEXUS are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/).
+
+---
+
+## [0.9.3] — 2026-06-18
+
+### Changed
+- **MemoryBackend ABC migration complete** — `get_context()` → `get_by_category()`, `retrieve()` → `get_by_category()` across all backends and callers
+- Fixed 15 test failures caused by interface migration
+- All **525 tests passing**
+
+### Fixed
+- Prompt injection pattern improvements in SafetyMonitor
+- Smoothed IDF computation in TFIDFMemoryBackend for stability with small corpora
+
+---
+
+## [0.9.2] — 2026-06-11
+
+### Added
+- **PyPI release** with full benchmark report
+
+### Changed
+- Memory benchmark results: **12.2% solve rate** vs 1.1% baseline (11× improvement)
+
+---
+
+## [0.9.1] — 2026-06-10
+
+### Fixed
+- 4 remaining bug fixes from 0.9.0 release
+- Benchmark report corrections and README rewrite
+
+---
+
+## [0.9.0] — 2026-06-09
+
+### Fixed
+- 8 memory and reflection bug fixes across `TFIDFMemoryBackend`, `ReflectionEngine`, and `RewardBuilder`
+
+### Changed
+- 4 performance optimizations in memory retrieval and reflection scoring
+- **TFIDFMemoryBackend** established as the default backend for all runtime paths
+
+---
+
+## [0.8.3] — 2026-06-05
+
+### Fixed
+- AutoCurriculum task generation edge cases
+- `Experiment.learn()` convergence issues with small episode counts
+
+---
+
+## [0.8.2] — 2026-06-03
+
+### Fixed
+- AutoLearner initialization when no prior episodes exist
+- SafetyLayer false-positive detection in edge cases
+- `episodes=0` parameter handling across train/evaluate APIs
+
+---
+
+## [0.8.1] — 2026-06-01
+
+### Fixed
+- Memory retrieval returning stale entries after backend swap
+- Replay persistence corruption on interrupted writes
+- Branch tracking state desync in multi-agent scenarios
+
+---
+
+## [0.8.0] — 2026-05-28
+
+### Added
+- **NEXUS Live Runtime Dashboard** with 9 real subsystems:
+  - Memory Explorer, Reflection Viewer, Safety Monitor, Reward Tracker
+  - Episode Timeline, Agent Health, Middleware Pipeline, Config Editor, Logs
+- **Agent Immune System** (`cognicore/immune/`) — anomaly detection and adaptive response for agent behavior
+- **Replay Time Travel** (`cognicore/replay/`) — rewind, branch, and replay agent episodes with RL integration
+
+---
+
+## [0.7.0] — 2026-05-20
+
+### Added
+- **NEXUS Autonomous Runner** — Devin-like engine for end-to-end task execution
+- **Enterprise integrations:**
+  - GitHub (PR creation, issue management)
+  - CI pipeline orchestration
+  - Slack notifications
+  - Linear issue tracking
+  - Scheduler for recurring tasks
+- **Multi-agent runtime** with 4 routing policies:
+  - Round-robin, capability-based, load-balanced, priority-queue
+
+---
+
+## [0.6.0] — 2026-05-10
+
+### Added
+- **Research features:**
+  - `FailurePredictor` — predict agent failure before it happens
+  - `CognitiveMemory` — biologically-inspired memory consolidation
+  - `RedVsBlue` — adversarial agent evaluation framework
+  - `AIDebugger` — automated agent behavior debugging
+  - `IntelligenceScorer` — multi-dimensional agent capability scoring
+  - `ThoughtTracer` — agent reasoning chain visualization
+  - `KnowledgeTransfer` — cross-agent knowledge sharing
+  - `EvolutionEngine` — evolutionary strategy optimization for agents
+- **SWE-bench runner** with **20/20 resolve rate** on test suite
 
 ---
 
@@ -91,20 +217,18 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
-## Roadmap
-
-| Target | Feature | Status |
-|--------|---------|--------|
-| v0.5.0 (May 2026) | Real-world environments (safety + code bugs) | ✅ Done |
-| v0.6.0 (July 2026) | Embedding-based semantic memory (optional `sentence-transformers`) | 🔜 Planned |
-| v0.6.0 (July 2026) | Parallel episode execution (`asyncio`) | 🔜 Planned |
-| v0.7.0 (Sept 2026) | Real-world dataset loader (HuggingFace integration) | 📋 Backlog |
-| v0.8.0 (Nov 2026) | `cognicore debug agent.py` — CLI debugger with breakpoints | 📋 Backlog |
-| v1.0.0 (Jan 2027) | Stable API, full documentation, production-ready | 📋 Backlog |
-
+[0.9.3]: https://github.com/Kaushalt2004/cognicore-my-openenv/compare/v0.9.2...v0.9.3
+[0.9.2]: https://github.com/Kaushalt2004/cognicore-my-openenv/compare/v0.9.1...v0.9.2
+[0.9.1]: https://github.com/Kaushalt2004/cognicore-my-openenv/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/Kaushalt2004/cognicore-my-openenv/compare/v0.8.3...v0.9.0
+[0.8.3]: https://github.com/Kaushalt2004/cognicore-my-openenv/compare/v0.8.2...v0.8.3
+[0.8.2]: https://github.com/Kaushalt2004/cognicore-my-openenv/compare/v0.8.1...v0.8.2
+[0.8.1]: https://github.com/Kaushalt2004/cognicore-my-openenv/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/Kaushalt2004/cognicore-my-openenv/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/Kaushalt2004/cognicore-my-openenv/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/Kaushalt2004/cognicore-my-openenv/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Kaushalt2004/cognicore-my-openenv/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Kaushalt2004/cognicore-my-openenv/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Kaushalt2004/cognicore-my-openenv/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Kaushalt2004/cognicore-my-openenv/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Kaushalt2004/cognicore-my-openenv/releases/tag/v0.1.0
-

@@ -6,6 +6,8 @@ import sqlite3, json, time, os, hashlib
 from typing import List, Dict, Optional
 from pathlib import Path
 
+from cognicore.utils.sqlite import connect_sqlite
+
 
 class PersistentCognitionStore:
     """Long-term persistent memory for CogniCore agents.
@@ -27,7 +29,7 @@ class PersistentCognitionStore:
         self._init_db()
 
     def _init_db(self):
-        with sqlite3.connect(self.db_path) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.execute("""CREATE TABLE IF NOT EXISTS episodes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 session_id TEXT,
@@ -71,7 +73,7 @@ class PersistentCognitionStore:
                       patch_hash: str = "", tactic: str = "",
                       success: bool = False, reflection: str = "",
                       metadata: Dict = None):
-        with sqlite3.connect(self.db_path) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.execute("""INSERT INTO episodes
                 (session_id, category, bug_id, action, outcome, error_trace,
                  patch_hash, tactic, success, reflection, metadata, created_at,
@@ -82,7 +84,7 @@ class PersistentCognitionStore:
                  json.dumps(metadata or {}), time.time(), time.time()))
 
     def retrieve_failures(self, category: str, limit: int = 10) -> List[Dict]:
-        with sqlite3.connect(self.db_path) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute("""SELECT * FROM episodes
                 WHERE category = ? AND success = 0
@@ -96,7 +98,7 @@ class PersistentCognitionStore:
             return [dict(r) for r in rows]
 
     def retrieve_successes(self, category: str, limit: int = 5) -> List[Dict]:
-        with sqlite3.connect(self.db_path) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute("""SELECT * FROM episodes
                 WHERE category = ? AND success = 1
@@ -105,7 +107,7 @@ class PersistentCognitionStore:
             return [dict(r) for r in rows]
 
     def store_strategy(self, category: str, strategy_name: str, success: bool):
-        with sqlite3.connect(self.db_path) as conn:
+        with connect_sqlite(self.db_path) as conn:
             existing = conn.execute(
                 "SELECT id, success_count, failure_count FROM strategies "
                 "WHERE category = ? AND strategy_name = ?",
@@ -128,7 +130,7 @@ class PersistentCognitionStore:
                               time.time(), "{}"))
 
     def get_best_strategies(self, category: str) -> List[Dict]:
-        with sqlite3.connect(self.db_path) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute("""SELECT * FROM strategies
                 WHERE category = ?
@@ -138,7 +140,7 @@ class PersistentCognitionStore:
 
     def store_reflection(self, category: str, bug_id: str, reflection: str,
                          triggered_by: str = "", mutation: str = ""):
-        with sqlite3.connect(self.db_path) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.execute("INSERT INTO reflections "
                          "(category, bug_id, reflection, triggered_by, "
                          "mutation_applied, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -171,7 +173,7 @@ class PersistentCognitionStore:
         }
 
     def get_stats(self) -> Dict:
-        with sqlite3.connect(self.db_path) as conn:
+        with connect_sqlite(self.db_path) as conn:
             total = conn.execute("SELECT COUNT(*) FROM episodes").fetchone()[0]
             successes = conn.execute("SELECT COUNT(*) FROM episodes WHERE success=1").fetchone()[0]
             categories = conn.execute("SELECT DISTINCT category FROM episodes").fetchall()
@@ -186,7 +188,7 @@ class PersistentCognitionStore:
             }
 
     def clear(self):
-        with sqlite3.connect(self.db_path) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.execute("DELETE FROM episodes")
             conn.execute("DELETE FROM strategies")
             conn.execute("DELETE FROM reflections")

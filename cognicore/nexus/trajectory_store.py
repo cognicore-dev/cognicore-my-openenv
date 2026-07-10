@@ -7,6 +7,8 @@ from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
 
+from cognicore.utils.sqlite import connect_sqlite
+
 
 @dataclass
 class TrajectoryStep:
@@ -72,7 +74,7 @@ class TrajectoryStore:
         self._init_db()
 
     def _init_db(self):
-        with sqlite3.connect(self.db_path) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.execute("""CREATE TABLE IF NOT EXISTS trajectories (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 task_id TEXT NOT NULL,
@@ -95,7 +97,7 @@ class TrajectoryStore:
 
     def store(self, traj: Trajectory):
         traj.compute_reward()
-        with sqlite3.connect(self.db_path) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.execute(
                 """INSERT INTO trajectories
                    (task_id, category, policy, seed, solved, total_attempts,
@@ -108,7 +110,7 @@ class TrajectoryStore:
                  json.dumps([asdict(s) for s in traj.steps]), traj.timestamp))
 
     def get_by_policy(self, policy: str) -> List[Dict]:
-        with sqlite3.connect(self.db_path) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 "SELECT * FROM trajectories WHERE policy=? ORDER BY timestamp",
@@ -116,7 +118,7 @@ class TrajectoryStore:
             return [dict(r) for r in rows]
 
     def get_by_task(self, task_id: str) -> List[Dict]:
-        with sqlite3.connect(self.db_path) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 "SELECT * FROM trajectories WHERE task_id=? ORDER BY timestamp",
@@ -125,7 +127,7 @@ class TrajectoryStore:
 
     def compare_policies(self) -> Dict:
         """Compare all policies by mean reward."""
-        with sqlite3.connect(self.db_path) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 """SELECT policy,
@@ -138,7 +140,7 @@ class TrajectoryStore:
             return {r["policy"]: dict(r) for r in rows}
 
     def get_stats(self) -> Dict:
-        with sqlite3.connect(self.db_path) as conn:
+        with connect_sqlite(self.db_path) as conn:
             total = conn.execute("SELECT COUNT(*) FROM trajectories").fetchone()[0]
             solved = conn.execute("SELECT COUNT(*) FROM trajectories WHERE solved=1").fetchone()[0]
             policies = conn.execute("SELECT DISTINCT policy FROM trajectories").fetchall()
@@ -150,14 +152,14 @@ class TrajectoryStore:
             }
 
     def clear(self):
-        with sqlite3.connect(self.db_path) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.execute("DELETE FROM trajectories")
 
     def export_for_training(self, path: str = None) -> str:
         """Export trajectories as JSONL for offline RL training."""
         if path is None:
             path = os.path.join(os.path.dirname(self.db_path), 'trajectories_export.jsonl')
-        with sqlite3.connect(self.db_path) as conn:
+        with connect_sqlite(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute("SELECT * FROM trajectories ORDER BY timestamp").fetchall()
         with open(path, 'w') as f:

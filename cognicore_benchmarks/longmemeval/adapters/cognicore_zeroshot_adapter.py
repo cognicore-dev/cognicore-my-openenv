@@ -177,10 +177,27 @@ class CognicoreZeroShotAdapter(BaseAgentAdapter):
         
         retrieved_memories = [self.chunks[idx].text for idx in final_top_k_indices]
         
+        # --- 4. Generate Answer using LLM ---
+        from cognicore_benchmarks.common.llm_client import LLMClient
+        model_name = os.environ.get("COGNICORE_EVAL_MODEL", "gemini-3.1-pro-preview")
+        client = LLMClient(model_name=model_name)
+        
+        context_text = "\n\n".join(retrieved_memories)
+        prompt = (
+            f"Here is the retrieved conversation history:\n\n"
+            f"{context_text}\n\n"
+            f"Based on the history above, please answer the following question. "
+            f"If the information is not in the history, say 'I don't know'.\n\n"
+            f"Question: {question}"
+        )
+        system_prompt = "You are a helpful assistant evaluating a conversation log."
+        
+        result = client.generate(prompt=prompt, system_prompt=system_prompt)
+        
         return {
-            "answer": "N/A - ZeroShot Multi-Hop Local Eval",
-            "latency_s": 0.0,
-            "tokens": 0,
+            "answer": result["content"],
+            "latency_s": result["latency_s"],
+            "tokens": result["prompt_tokens"] + result["completion_tokens"],
             "retrieved_memories": retrieved_memories,
             "ranking_scores": [score_map[idx] for idx in final_top_k_indices]
         }

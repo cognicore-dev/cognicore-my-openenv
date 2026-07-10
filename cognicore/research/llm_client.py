@@ -54,12 +54,16 @@ class LLMClient:
 
         elif provider == "openai":
             key = os.environ.get("OPENAI_API_KEY")
+            base_url = os.environ.get("OPENAI_BASE_URL")
             if not key:
                 return
             try:
                 from openai import OpenAI
-                self._client = OpenAI(api_key=key)
-                self.model = self.model or "gpt-4o-mini"
+                kwargs = {"api_key": key}
+                if base_url:
+                    kwargs["base_url"] = base_url
+                self._client = OpenAI(**kwargs)
+                self.model = self.model or "gpt-4.1-mini"
                 self.provider = "openai"
                 self.available = True
             except ImportError:

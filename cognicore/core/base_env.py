@@ -33,7 +33,8 @@ from cognicore.core.types import (
     ProposalFeedback,
     StructuredReward,
 )
-from cognicore.middleware.memory import Memory
+from cognicore.memory.tfidf_backend import TFIDFMemoryBackend
+from cognicore.memory.lifecycle import MemoryLifecycleManager
 from cognicore.middleware.reflection import ReflectionEngine
 from cognicore.middleware.rewards import RewardBuilder
 from cognicore.middleware.propose_revise import ProposeReviseProtocol
@@ -86,21 +87,21 @@ class CogniCoreEnv(ABC):
         self.config = config or CogniCoreConfig()
 
         # ---- Cognitive Middleware ----
-        self.memory = Memory(
+        self.backend = TFIDFMemoryBackend(
             max_size=self.config.memory_max_size,
-            similarity_key=self.config.memory_similarity_key,
         )
+        self.memory = MemoryLifecycleManager(self.backend)
         self.reflection = ReflectionEngine(
-            memory=self.memory,
+            memory=self.backend,
             min_samples=self.config.reflection_min_samples,
             failure_threshold=self.config.reflection_failure_threshold,
         )
         self.reward_builder = RewardBuilder(
             config=self.config,
-            memory=self.memory,
+            memory=self.backend,
         )
         self.propose_revise = ProposeReviseProtocol(
-            memory=self.memory,
+            memory=self.backend,
             reflection=self.reflection,
             max_proposals=self.config.max_proposals_per_step,
         )
@@ -271,10 +272,9 @@ class CogniCoreEnv(ABC):
         # Safety monitor
         streak_penalty = self.safety_monitor.check(eval_result.correct)
 
-        # Check if this is a novel group
-        is_novel = eval_result.category != "" and not self.memory.has_seen_group(
-            eval_result.category
-        )
+        is_novel = eval_result.category != "" and len(self.backend.get_by_category(
+            eval_result.category, top_k=1
+        )) == 0
 
         # Check if agent followed reflection hint
         followed_hint = False
@@ -305,19 +305,20 @@ class CogniCoreEnv(ABC):
             step_start_time=self._step_start_time,
         )
 
-        # Store in memory
         if self.config.enable_memory and eval_result.category:
-            self.memory.store(
-                {
-                    self.config.memory_similarity_key: eval_result.category,
-                    "predicted": str(eval_result.predicted),
+            from cognicore.memory.base import MemoryEntry
+            self.memory.store_direct(MemoryEntry(
+                text=str(eval_result.predicted),
+                category=eval_result.category,
+                correct=eval_result.correct,
+                action=str(eval_result.predicted),
+                metadata={
                     "ground_truth": str(eval_result.ground_truth),
-                    "correct": eval_result.correct,
                     "reward": reward.total,
+                    "episode": self._episode_count,
                     **eval_result.metadata,
-                },
-                episode=self._episode_count,
-            )
+                }
+            ))
             self._episode_memory_entries += 1
 
         # Update counters
@@ -422,7 +423,7 @@ class CogniCoreEnv(ABC):
             "accuracy": round(accuracy, 4),
             "agent_status": self.safety_monitor.status(),
             "wrong_streak": self.safety_monitor.get_wrong_streak(),
-            "memory_stats": self.memory.stats(),
+            "memory_stats": self.memory.get_health_report(),
             "reflection_stats": self.reflection.stats(),
             "safety_stats": self.safety_monitor.stats(),
         }
@@ -476,9 +477,13 @@ class CogniCoreEnv(ABC):
                 group_value = current_task.get("category", "")
 
             if group_value:
-                obs["memory_context"] = self.memory.get_context(
-                    group_value, top_k=self.config.memory_retrieve_top_k
-                )
+                obs["memory_context"] = [
+                    r.entry.to_dict() for r in self.memory.retrieve(
+                        query=str(current_task),
+                        task=group_value,
+                        top_k=self.config.memory_retrieve_top_k
+                    )
+                ]
 
         # Inject reflection hint
         if self.config.enable_reflection:

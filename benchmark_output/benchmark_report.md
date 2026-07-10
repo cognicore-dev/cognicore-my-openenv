@@ -1,7 +1,7 @@
 # CogniCore Memory Benchmark Report
 
-> **Generated:** 2026-06-08 05:12 UTC
-> **CogniCore Version:** 0.9.2
+> **Generated:** 2026-06-11 05:43 UTC
+> **CogniCore Version:** 0.9.3
 > **Seed:** 42
 
 ---
@@ -116,7 +116,7 @@ successful strategies instead of exploring blindly.
 ## Reproducibility
 
 ```bash
-pip install cognicore-env==0.9.2
+pip install cognicore-env==0.9.3
 python benchmark.py --episodes 5 --seed 42 \
     --envs CodeDebugging-v1 RealWorldCodeBugs-v1 SafetyClassification-v1 RealWorldSafety-v1 Planning-v1 WorkflowAgent-v1
 ```

@@ -156,7 +156,7 @@ class ThreatDetector:
             score += 0.15
 
         # Nested quotes or role-play framing
-        nested = len(re.findall(r'["\'].*["\'].*["\']', text))
+        nested = text.count('"') // 2 + text.count("'") // 2
         if nested > 3:
             score += 0.1
 

@@ -11,17 +11,15 @@ from cognicore.finetuning import EpisodeRecorder, export_jsonl, export_reward_da
 from cognicore.multi_agent import DebateEnv
 
 
-# Use a temp directory inside the project for all tests
-TEST_DIR = os.path.join(os.path.dirname(__file__), "..", "_test_data")
-
+worker_id = os.environ.get("PYTEST_XDIST_WORKER", "gw0")
+TEST_DIR = os.path.join(os.path.dirname(__file__), "..", f"_test_data_new_features_{worker_id}")
 
 def setup_module():
     os.makedirs(TEST_DIR, exist_ok=True)
 
-
 def teardown_module():
     if os.path.exists(TEST_DIR):
-        shutil.rmtree(TEST_DIR)
+        shutil.rmtree(TEST_DIR, ignore_errors=True)
 
 
 # ---- MemoryManager ----
