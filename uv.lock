@@ -622,7 +622,7 @@ wheels = [
 
 [[package]]
 name = "cognicore-env"
-version = "0.9.4"
+version = "0.9.5"
 source = { editable = "." }
 dependencies = [
     { name = "jsonschema" },
@@ -634,6 +634,7 @@ dependencies = [
 [package.optional-dependencies]
 all = [
     { name = "anthropic" },
+    { name = "chromadb" },
     { name = "crewai" },
     { name = "fastapi" },
     { name = "google-genai" },
@@ -648,6 +649,7 @@ all = [
     { name = "openai-agents" },
     { name = "pydantic" },
     { name = "pygame" },
+    { name = "pyjwt" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-xdist" },
@@ -671,6 +673,9 @@ embeddings = [
     { name = "openai" },
     { name = "sentence-transformers" },
 ]
+extension = [
+    { name = "mcp", extra = ["cli"] },
+]
 hf = [
     { name = "huggingface-hub" },
 ]
@@ -686,6 +691,7 @@ mcp = [
     { name = "mcp", extra = ["cli"] },
 ]
 memory = [
+    { name = "chromadb" },
     { name = "sentence-transformers" },
 ]
 memory-providers = [
@@ -708,13 +714,15 @@ rl = [
 server = [
     { name = "fastapi" },
     { name = "pydantic" },
+    { name = "pyjwt" },
     { name = "uvicorn" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "anthropic", marker = "extra == 'llm'", specifier = ">=0.30" },
-    { name = "cognicore-env", extras = ["rl", "rendering", "memory", "hf", "llm", "embeddings", "server", "mcp", "langchain", "crewai", "openai-agents", "memory-providers", "dev"], marker = "extra == 'all'" },
+    { name = "chromadb", marker = "extra == 'memory'", specifier = ">=0.4.0" },
+    { name = "cognicore-env", extras = ["rl", "rendering", "memory", "hf", "llm", "embeddings", "server", "mcp", "langchain", "crewai", "openai-agents", "memory-providers", "extension", "dev"], marker = "extra == 'all'" },
     { name = "crewai", marker = "extra == 'crewai'", specifier = ">=0.50" },
     { name = "fastapi", marker = "extra == 'server'", specifier = ">=0.110" },
     { name = "google-genai", marker = "extra == 'llm'", specifier = ">=0.1" },
@@ -723,6 +731,7 @@ requires-dist = [
     { name = "huggingface-hub", marker = "extra == 'hf'", specifier = ">=0.20" },
     { name = "jsonschema", specifier = ">=4.0.0" },
     { name = "langchain", marker = "extra == 'langchain'", specifier = ">=0.2" },
+    { name = "mcp", extras = ["cli"], marker = "extra == 'extension'", specifier = ">=1.0" },
     { name = "mcp", extras = ["cli"], marker = "extra == 'mcp'", specifier = ">=1.0" },
     { name = "mem0ai", marker = "extra == 'memory-providers'", specifier = ">=2.0" },
     { name = "mempalace", marker = "extra == 'memory-providers'", specifier = ">=3.5" },
@@ -732,6 +741,7 @@ requires-dist = [
     { name = "openai-agents", marker = "extra == 'openai-agents'", specifier = ">=0.1" },
     { name = "pydantic", marker = "extra == 'server'", specifier = ">=2.0" },
     { name = "pygame", marker = "extra == 'rendering'", specifier = ">=2.5" },
+    { name = "pyjwt", marker = "extra == 'server'", specifier = ">=2.8.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.0" },
@@ -743,7 +753,7 @@ requires-dist = [
     { name = "uvicorn", marker = "extra == 'server'", specifier = ">=0.27" },
     { name = "zep-cloud", marker = "extra == 'memory-providers'", specifier = ">=3.23" },
 ]
-provides-extras = ["rl", "rendering", "memory", "hf", "llm", "embeddings", "server", "mcp", "langchain", "crewai", "openai-agents", "memory-providers", "dev", "all"]
+provides-extras = ["rl", "rendering", "memory", "hf", "llm", "embeddings", "server", "mcp", "langchain", "crewai", "openai-agents", "memory-providers", "extension", "dev", "all"]
 
 [[package]]
 name = "colorama"

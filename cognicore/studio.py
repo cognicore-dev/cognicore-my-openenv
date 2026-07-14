@@ -702,41 +702,47 @@ def create_studio_app():
 
     @app.get("/api/memory/health")
     def get_memory_health():
-        # Scrape all agent directories for memory.json
-        storage_dir = os.path.abspath("./cognicore_data")
         total_memories = 0
         total_utility = 0.0
         negative_count = 0
         
         try:
             from cognicore.memory.utility import UtilityScorer
-            from cognicore.memory.base import MemoryEntry
             scorer = UtilityScorer()
         except ImportError:
             return {"total_memories": 0, "avg_utility": 0, "negative_transfer_count": 0}
             
-        if os.path.exists(storage_dir):
-            for agent_id in os.listdir(storage_dir):
-                mem_path = os.path.join(storage_dir, agent_id, "memory.json")
-                if os.path.exists(mem_path):
-                    with open(mem_path, "r") as f:
-                        try:
-                            entries_data = json.load(f)
-                            if isinstance(entries_data, dict):
-                                entries_data = list(entries_data.values())
-                            
-                            for d in entries_data:
-                                try:
+        try:
+            from cognicore.memory.chroma_backend import ChromaMemoryBackend
+            backend = ChromaMemoryBackend()
+            entries = backend.get_all()
+            for entry in entries:
+                total_memories += 1
+                total_utility += entry.utility_score
+                if scorer.detect_negative_transfer(entry):
+                    negative_count += 1
+        except ImportError:
+            # Fallback to json scraping
+            storage_dir = os.path.abspath("./cognicore_data")
+            from cognicore.memory.base import MemoryEntry
+            if os.path.exists(storage_dir):
+                for agent_id in os.listdir(storage_dir):
+                    mem_path = os.path.join(storage_dir, agent_id, "memory.json")
+                    if os.path.exists(mem_path):
+                        with open(mem_path, "r") as f:
+                            try:
+                                entries_data = json.load(f)
+                                if isinstance(entries_data, dict):
+                                    entries_data = list(entries_data.values())
+                                for d in entries_data:
                                     entry = MemoryEntry.from_dict(d)
                                     total_memories += 1
                                     total_utility += entry.utility_score
                                     if scorer.detect_negative_transfer(entry):
                                         negative_count += 1
-                                except Exception:
-                                    pass
-                        except Exception:
-                            pass
-                            
+                            except Exception:
+                                pass
+                                
         avg_util = total_utility / total_memories if total_memories > 0 else 0.0
         return {
             "total_memories": total_memories,
@@ -746,151 +752,88 @@ def create_studio_app():
 
     @app.get("/api/memory/entries")
     def get_memory_entries():
-        storage_dir = os.path.abspath("./cognicore_data")
         all_entries = []
-        
         try:
             from cognicore.memory.utility import UtilityScorer
-            from cognicore.memory.base import MemoryEntry
             scorer = UtilityScorer()
         except ImportError:
             return []
             
-        if os.path.exists(storage_dir):
-            for agent_id in os.listdir(storage_dir):
-                mem_path = os.path.join(storage_dir, agent_id, "memory.json")
-                if os.path.exists(mem_path):
-                    with open(mem_path, "r") as f:
-                        try:
-                            entries_data = json.load(f)
-                            if isinstance(entries_data, dict):
-                                entries_data = list(entries_data.values())
-                                
-                            for d in entries_data:
-                                try:
-                                    entry = MemoryEntry.from_dict(d)
-                                    e_dict = entry.to_dict()
-                                    e_dict['agent_id'] = agent_id
-                                    e_dict['negative_transfer'] = scorer.detect_negative_transfer(entry)
-                                    all_entries.append(e_dict)
-                                except Exception:
-                                    pass
-                        except Exception:
-                            pass
-                            
+        try:
+            from cognicore.memory.chroma_backend import ChromaMemoryBackend
+            backend = ChromaMemoryBackend()
+            entries = backend.get_all()
+            for entry in entries:
+                e_dict = entry.to_dict()
+                e_dict['agent_id'] = entry.scope_id if entry.scope_id else "global"
+                e_dict['negative_transfer'] = scorer.detect_negative_transfer(entry)
+                all_entries.append(e_dict)
+        except ImportError:
+            storage_dir = os.path.abspath("./cognicore_data")
+            from cognicore.memory.base import MemoryEntry
+            if os.path.exists(storage_dir):
+                for agent_id in os.listdir(storage_dir):
+                    mem_path = os.path.join(storage_dir, agent_id, "memory.json")
+                    if os.path.exists(mem_path):
+                        with open(mem_path, "r") as f:
+                            try:
+                                entries_data = json.load(f)
+                                if isinstance(entries_data, dict):
+                                    entries_data = list(entries_data.values())
+                                for d in entries_data:
+                                    try:
+                                        entry = MemoryEntry.from_dict(d)
+                                        e_dict = entry.to_dict()
+                                        e_dict['agent_id'] = agent_id
+                                        e_dict['negative_transfer'] = scorer.detect_negative_transfer(entry)
+                                        all_entries.append(e_dict)
+                                    except Exception:
+                                        pass
+                            except Exception:
+                                pass
         return all_entries
         
     @app.get("/api/memory/query")
     def query_memory(query: str):
-        import time
-        import math
-        import re as pyre
-        import os
         import logging
         logger = logging.getLogger("studio_query")
         
         try:
-            import chromadb
-            from sentence_transformers import SentenceTransformer
-            CHROMA_AVAILABLE = True
+            from cognicore.memory.chroma_backend import ChromaMemoryBackend
+            backend = ChromaMemoryBackend()
         except ImportError:
-            CHROMA_AVAILABLE = False
+            return {"error": "ChromaMemoryBackend is not available."}
             
         final_results = []
-        
-        if CHROMA_AVAILABLE:
-            try:
-                chroma_dir = os.path.abspath("./cognicore_data/chroma_db")
-                client = chromadb.PersistentClient(path=chroma_dir)
-                collection = client.get_collection(name="cognicore_memories")
-                
-                # Load model locally (cached if already run)
-                model = SentenceTransformer('all-MiniLM-L6-v2')
-                
-                # Hop 1
-                q_emb = model.encode([query]).tolist()
-                res1 = collection.query(
-                    query_embeddings=q_emb,
-                    n_results=2
-                )
-                
-                top_hop1 = []
-                hop1_texts = []
-                if res1 and res1['documents'] and res1['documents'][0]:
-                    for i in range(len(res1['documents'][0])):
-                        text = res1['documents'][0][i]
-                        meta = res1['metadatas'][0][i]
-                        # Chroma returns distances (lower is better). Let's invert it for similarity score.
-                        dist = res1['distances'][0][i]
-                        sim = max(0.01, 1.0 - (dist / 2.0))
-                        
-                        top_hop1.append({
-                            "text": text,
-                            "similarity": sim,
-                            "agent_id": meta.get("agent_id", "unknown"),
-                            "hop": 1,
-                            "memory_type": meta.get("memory_type", "semantic"),
-                            "timestamp": meta.get("timestamp", 0)
-                        })
-                        hop1_texts.append(text)
-                
-                # Hop 2
-                hop2_results = []
-                if top_hop1:
-                    q_words = set(pyre.findall(r'\w+', query.lower()))
-                    hop2_words = set()
-                    for r in top_hop1:
-                        hop2_words.update(pyre.findall(r'\w+', r['text'].lower()))
-                    hop2_words = hop2_words - q_words
-                    hop2_words = {w for w in hop2_words if len(w) > 4}
-                    
-                    if hop2_words:
-                        hop2_query = " ".join(hop2_words)
-                        h2_emb = model.encode([hop2_query]).tolist()
-                        res2 = collection.query(
-                            query_embeddings=h2_emb,
-                            n_results=3
-                        )
-                        
-                        if res2 and res2['documents'] and res2['documents'][0]:
-                            for i in range(len(res2['documents'][0])):
-                                text = res2['documents'][0][i]
-                                if text in hop1_texts:
-                                    continue
-                                meta = res2['metadatas'][0][i]
-                                dist = res2['distances'][0][i]
-                                sim = max(0.01, 1.0 - (dist / 2.0)) * 0.8 # Penalty for hop 2
-                                
-                                hop2_results.append({
-                                    "text": text,
-                                    "similarity": sim,
-                                    "agent_id": meta.get("agent_id", "unknown"),
-                                    "hop": 2,
-                                    "memory_type": meta.get("memory_type", "semantic"),
-                                    "timestamp": meta.get("timestamp", 0)
-                                })
-                
-                final_results = top_hop1 + hop2_results[:2]
-                
-            except Exception as e:
-                logger.error(f"ChromaDB Query Failed: {e}")
-                
-        # Fallback to dummy if chroma fails or is empty
-        if not final_results:
-            return [{"text": "Vector Database uninitialized or empty. Run migration script.", "similarity": 0, "agent_id": "system", "hop": 1}]
+        try:
+            from cognicore.memory.base import MemoryScope
             
-        # Apply Temporal Decay for preference memories
-        now = time.time()
-        half_life = 30 * 24 * 3600 # 30 days
+            # Use the global pool scope to fetch across all agents
+            results = backend.search(query=query, top_k=15, scope=MemoryScope.GLOBAL)
+            
+            for res in results:
+                entry = res.entry
+                final_results.append({
+                    "text": entry.text,
+                    "similarity": res.score,
+                    "agent_id": entry.scope_id if entry.scope_id else "global",
+                    "hop": 1,
+                    "memory_type": entry.memory_type,
+                    "timestamp": entry.timestamp
+                })
+        except Exception as e:
+            logger.error(f"Error querying memory backend: {e}")
+            return {"error": str(e)}
+            
+        # Deduplicate based on text
+        unique = {}
         for r in final_results:
-            if r.get("memory_type") == "preference" and r.get("timestamp", 0) > 0:
-                age = max(0, now - r["timestamp"])
-                decay = math.exp(-0.693 * (age / half_life)) if half_life > 0 else 1.0
-                r["similarity"] = r["similarity"] * decay
-                r["text"] = f"[Decayed by {int((1-decay)*100)}%] " + r["text"]
-                
-        final_results.sort(key=lambda x: x["similarity"], reverse=True)
-        return final_results
+            if r['text'] not in unique:
+                unique[r['text']] = r
+        
+        ret = list(unique.values())
+        ret.sort(key=lambda x: x['similarity'], reverse=True)
+        return {"items": ret[:10]}
 
     @app.get("/api/memory/traces")
     def get_traces():

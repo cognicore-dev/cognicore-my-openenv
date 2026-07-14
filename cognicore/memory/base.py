@@ -24,6 +24,7 @@ class MemoryScope(Enum):
     USER = "user"
     SESSION = "session"
     AGENT = "agent"
+    PROJECT = "project"
 
 
 class MemoryState(str, Enum):

@@ -210,23 +210,41 @@ class SleepProcessor:
         t1 = text1.lower()
         t2 = text2.lower()
         
-        # Check opposing key terms in overlapping context
+        # Check opposing key terms using LLM if available
+        if self.llm_fn:
+            prompt = (
+                "Analyze the following two memory facts and determine if they strictly contradict each other.\n"
+                "A contradiction means both cannot be true at the same time for the same user.\n"
+                f"Fact 1: {text1}\n"
+                f"Fact 2: {text2}\n"
+                "Respond ONLY with 'YES' if they contradict, or 'NO' if they do not."
+            )
+            try:
+                response = self.llm_fn(prompt).strip().upper()
+                if response.startswith("YES"):
+                    return True
+                elif response.startswith("NO"):
+                    return False
+            except Exception as e:
+                logger.warning(f"LLM contradiction check failed: {e}. Falling back to heuristic.")
+        
+        # Fallback heuristic
         words1 = set(t1.split())
         words2 = set(t2.split())
         
-        # If there is decent overlap in context words
         overlap = words1 & words2
         if len(overlap) >= 2:
             opposites = [
                 ("space", "tab"), ("spaces", "tabs"), 
                 ("dark", "light"), ("always", "never"),
-                ("true", "false"), ("yes", "no")
+                ("true", "false"), ("yes", "no"),
+                ("prefers", "hates"), ("enable", "disable"),
+                ("likes", "dislikes"), ("loves", "hates")
             ]
             for op1, op2 in opposites:
                 if (op1 in words1 and op2 in words2) or (op2 in words1 and op1 in words2):
                     return True
                     
-        # Negation check
         w_list1 = [w for w in t1.split() if w.isalnum()]
         w_list2 = [w for w in t2.split() if w.isalnum()]
         negations = {"not", "never", "no", "don't", "avoid", "cannot"}
