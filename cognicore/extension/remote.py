@@ -130,6 +130,16 @@ def cognicore_list(ctx: Context, limit: int = 10, category: str = "", scope: str
 # Create the FastAPI app
 app = FastAPI(title="CogniCore Remote MCP Server")
 
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # In production, restrict this to Claude's domains
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 @app.middleware("http")
 async def verify_auth_header(request: Request, call_next):
     if request.url.path.startswith("/mcp"):
