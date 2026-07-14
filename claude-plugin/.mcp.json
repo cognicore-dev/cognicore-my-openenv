@@ -2,7 +2,7 @@
   "mcpServers": {
     "cognicore": {
       "type": "sse",
-      "url": "http://localhost:8000/mcp/sse",
+      "url": "https://c625022117030e.lhr.life/mcp/sse",
       "headers": {
         "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0X3VzZXJfMSJ9.6J7y8AazQxdJapC1z1TpXpiC8Pm_RZA9knfR-Lodn3g"
       }
