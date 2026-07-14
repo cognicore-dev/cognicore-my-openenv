@@ -1,8 +1,16 @@
 {
-  "name": "CogniCore Beta Marketplace",
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "cognicore-beta-marketplace",
+  "description": "Beta marketplace for CogniCore Memory plugin",
+  "owner": {
+    "name": "CogniCore"
+  },
   "plugins": [
     {
-      "path": "claude-plugin"
+      "name": "cognicore-memory",
+      "description": "Persistent memory for Claude across conversations.",
+      "category": "productivity",
+      "source": "./claude-plugin"
     }
   ]
 }
