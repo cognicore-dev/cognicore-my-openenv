@@ -205,8 +205,8 @@ def cmd_doctor(args):
 
     # Python version
     py = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-    ok = sys.version_info >= (3, 9)
-    print(f"  Python {py:20s} {'✓' if ok else '✗ (need 3.9+)'}")
+    ok = sys.version_info >= (3, 10)
+    print(f"  Python {py:20s} {'✓' if ok else '✗ (need 3.10+)'}")
 
     # CogniCore version
     try:

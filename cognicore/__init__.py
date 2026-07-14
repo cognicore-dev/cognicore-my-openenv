@@ -22,7 +22,7 @@ Quick start::
     print(env.episode_stats())
 """
 
-__version__ = "0.9.3"
+__version__ = "0.9.5"
 
 # Core
 from cognicore.core.base_env import CogniCoreEnv
