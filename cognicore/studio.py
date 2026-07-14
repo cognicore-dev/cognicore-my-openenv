@@ -21,7 +21,7 @@ STUDIO_HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CogniCore Observability</title>
+<title>CogniCore Studio</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -187,7 +187,7 @@ STUDIO_HTML = r"""<!DOCTYPE html>
   <div style="display: flex; gap: 32px; align-items: center; height: 100%;">
     <div class="brand">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-      CogniCore Advanced
+      CogniCore Studio
     </div>
     <div class="tabs">
       <button class="active" onclick="showTab('health')">Overview</button>
@@ -721,8 +721,8 @@ def create_studio_app():
                 total_utility += entry.utility_score
                 if scorer.detect_negative_transfer(entry):
                     negative_count += 1
-        except ImportError:
-            # Fallback to json scraping
+        except Exception:
+            # Fallback when chroma extras are missing or backend init fails
             storage_dir = os.path.abspath("./cognicore_data")
             from cognicore.memory.base import MemoryEntry
             if os.path.exists(storage_dir):
@@ -768,7 +768,7 @@ def create_studio_app():
                 e_dict['agent_id'] = entry.scope_id if entry.scope_id else "global"
                 e_dict['negative_transfer'] = scorer.detect_negative_transfer(entry)
                 all_entries.append(e_dict)
-        except ImportError:
+        except Exception:
             storage_dir = os.path.abspath("./cognicore_data")
             from cognicore.memory.base import MemoryEntry
             if os.path.exists(storage_dir):

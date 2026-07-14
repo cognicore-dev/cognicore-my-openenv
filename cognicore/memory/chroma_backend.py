@@ -207,3 +207,30 @@ class ChromaMemoryBackend(MemoryBackend):
         except Exception as e:
             logger.error(f"Failed to get_all from Chroma: {e}")
             return []
+
+    def get_by_category(self, category: str, top_k: int = 5,
+                        success_filter: Optional[bool] = None) -> List[MemoryEntry]:
+        results: List[MemoryEntry] = []
+        for entry in reversed(self.get_all()):
+            if entry.category != category:
+                continue
+            if success_filter is not None and entry.correct != success_filter:
+                continue
+            results.append(entry)
+            if len(results) >= top_k:
+                break
+        return results
+
+    def count(self) -> int:
+        try:
+            return int(self.collection.count())
+        except Exception:
+            return len(self.get_all())
+
+    def clear(self) -> None:
+        try:
+            ids = self.collection.get().get("ids") or []
+            if ids:
+                self.collection.delete(ids=ids)
+        except Exception as e:
+            logger.error(f"Failed to clear Chroma collection: {e}")
