@@ -1,0 +1,7 @@
+{
+  "name": "CogniCore Memory",
+  "description": "Persistent memory for Claude across conversations.",
+  "version": "1.0.0",
+  "author": "CogniCore",
+  "homepage": "https://github.com/Kaushalt2004/cognicore-my-openenv"
+}
