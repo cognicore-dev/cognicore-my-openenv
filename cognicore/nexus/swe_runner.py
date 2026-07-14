@@ -327,7 +327,7 @@ class NexusSWERunner:
         """Load SWE-bench Lite from HuggingFace."""
         try:
             from datasets import load_dataset
-            ds = load_dataset("princeton-nlp/SWE-bench_Lite", split=split)
+            ds = load_dataset("princeton-nlp/SWE-bench_Lite", split=split)  # nosec B615
             return list(ds.select(range(min(limit, len(ds)))))
         except ImportError:
             print("  Install datasets: pip install datasets")

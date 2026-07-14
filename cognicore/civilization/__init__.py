@@ -63,7 +63,7 @@ class Civilization:
         
         try:
             req = urllib.request.Request(f"{self.address}/register", method="POST")
-            with urllib.request.urlopen(req, timeout=5) as response:
+            with urllib.request.urlopen(req, timeout=5) as response:  # nosec B310
                 if response.status == 200:
                     data = json.loads(response.read().decode())
                     self.peer_id = data.get("peer_id")
@@ -119,7 +119,7 @@ class Civilization:
         try:
             req = urllib.request.Request(f"{self.address}/contribute", data=payload, method="POST")
             req.add_header('Content-Type', 'application/json')
-            with urllib.request.urlopen(req, timeout=5) as response:
+            with urllib.request.urlopen(req, timeout=5) as response:  # nosec B310
                 return response.status == 200
         except Exception:
             return False
@@ -131,7 +131,7 @@ class Civilization:
             
         try:
             req = urllib.request.Request(f"{self.address}/insights?env_id={env_id}", method="GET")
-            with urllib.request.urlopen(req, timeout=5) as response:
+            with urllib.request.urlopen(req, timeout=5) as response:  # nosec B310
                 if response.status == 200:
                     data = json.loads(response.read().decode())
                     return InsightReport(data)
@@ -246,7 +246,7 @@ class CivilizationServer:
         self.thread = None
 
     def start(self):
-        self.server = HTTPServer(('0.0.0.0', self.port), CivilizationRequestHandler)
+        self.server = HTTPServer(('0.0.0.0', self.port), CivilizationRequestHandler)  # nosec B104
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
 

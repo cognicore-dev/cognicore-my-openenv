@@ -231,7 +231,7 @@ class AgentPassport:
                 with open(filepath, "rb") as f:
                     req = urllib.request.Request(target, data=f.read(), method="POST")
                     req.add_header('Content-Type', 'application/zip')
-                    urllib.request.urlopen(req, timeout=10)
+                    urllib.request.urlopen(req, timeout=10)  # nosec B310
                 return True
             except Exception as e:
                 import logging

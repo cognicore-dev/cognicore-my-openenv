@@ -2,7 +2,7 @@
 NEXUS RL Policy Learner — learns orchestration policies from trajectory data.
 Uses offline RL (Conservative Q-Learning style) on 220+ stored trajectories.
 """
-import json, math, random, os, sys
+import json, math, random, os, sys, ast
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 from collections import defaultdict
 from cognicore.nexus.trajectory_store import TrajectoryStore
@@ -124,7 +124,7 @@ class QLearningPolicyAgent:
             data = json.load(f)
         self.training_steps = data["training_steps"]
         for k, v in data["q_table"].items():
-            self.q_table[eval(k)] = v
+            self.q_table[ast.literal_eval(k)] = v
 
 
 def train_policy():

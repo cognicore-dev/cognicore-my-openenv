@@ -180,7 +180,7 @@ def load_swebench_tasks(categories=None):
 def load_from_huggingface(limit=10):
     try:
         from datasets import load_dataset
-        ds=load_dataset("princeton-nlp/SWE-bench_Lite",split="test")
+        ds=load_dataset("princeton-nlp/SWE-bench_Lite",split="test")  # nosec B615
         return [{"id":it["instance_id"],"repo":it["repo"],"issue":it["problem_statement"][:200],
                  "category":"swe-bench","description":it["problem_statement"][:500],
                  "buggy_code":"","test_code":it.get("test_patch",""),

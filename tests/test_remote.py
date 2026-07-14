@@ -27,11 +27,8 @@ def test_remote_missing_sub():
 
 def test_remote_with_valid_jwt():
     token = create_token("user_123")
-    try:
-        response = client.get("/mcp/sse", headers={"Authorization": f"Bearer {token}"}, timeout=1.0)
-    except Exception:
-        # Starlette SSE might timeout in TestClient due to endless stream
-        pass
+    with client.stream("GET", "/mcp/sse", headers={"Authorization": f"Bearer {token}"}) as response:
+        assert response.status_code == 200
     
     # We can also test that POST /mcp/message returns 400 (Bad Request from fastmcp for bad sessionId) instead of 401
     response = client.post("/mcp/message?sessionId=123", headers={"Authorization": f"Bearer {token}"})

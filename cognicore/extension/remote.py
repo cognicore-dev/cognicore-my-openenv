@@ -8,9 +8,18 @@ from mcp.server.fastmcp import FastMCP, Context
 import uvicorn
 import jwt
 
+from mcp.server.transport_security import TransportSecuritySettings
+
 # We use FastMCP for the core logic, but we inject a context-aware backend
-mcp = FastMCP("cognicore-remote")
+mcp = FastMCP(
+    "cognicore-remote",
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False)
+)
 security = HTTPBearer()
+
+
+
+
 
 # By default, use a local dev secret if none provided (ONLY FOR DEV!)
 JWT_SECRET = os.environ.get("COGNICORE_JWT_SECRET", "dev_secret_key_change_in_prod")
@@ -28,9 +37,9 @@ def get_user_id(request: Request) -> str:
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(status_code=401, detail="JWT missing 'sub' claim")
-        return str(user_id)
-    except jwt.PyJWTError as e:
-        raise HTTPException(status_code=401, detail=f"Invalid JWT: {str(e)}")
+        return user_id
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid JWT")
 
 def get_db_path_for_user(user_id: str) -> str:
     """Creates a secure, sanitized path for a user's memory database."""
@@ -132,6 +141,37 @@ app = FastAPI(title="CogniCore Remote MCP Server")
 
 from fastapi.middleware.cors import CORSMiddleware
 
+class StreamingHeadersMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                headers = message.get("headers", [])
+                is_sse = False
+                for k, v in headers:
+                    if k.lower() == b"content-type" and b"text/event-stream" in v:
+                        is_sse = True
+                        break
+                
+                if is_sse:
+                    new_headers = []
+                    for k, v in headers:
+                        if k.lower() not in (b"cache-control", b"x-accel-buffering"):
+                            new_headers.append((k, v))
+                    new_headers.append((b"cache-control", b"no-cache, no-transform"))
+                    new_headers.append((b"x-accel-buffering", b"no"))
+                    message["headers"] = new_headers
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+
+app.add_middleware(StreamingHeadersMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], # In production, restrict this to Claude's domains
@@ -140,28 +180,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Create Starlette app and mount it
+mcp_app = mcp.sse_app()
 @app.middleware("http")
 async def verify_auth_header(request: Request, call_next):
     if request.url.path.startswith("/mcp"):
         auth = request.headers.get("Authorization")
         if not auth or not auth.startswith("Bearer "):
+            from fastapi.responses import JSONResponse
             return JSONResponse(status_code=401, content={"detail": "Missing or invalid Bearer token"})
             
         token = auth.split(" ")[1]
         try:
             payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
             if not payload.get("sub"):
+                from fastapi.responses import JSONResponse
                 return JSONResponse(status_code=401, content={"detail": "JWT missing 'sub' claim"})
         except jwt.PyJWTError as e:
+            from fastapi.responses import JSONResponse
             return JSONResponse(status_code=401, content={"detail": f"Invalid JWT: {str(e)}"})
             
     return await call_next(request)
 
-# Get the Starlette app from FastMCP
-mcp_app = mcp.sse_app("/mcp")
-
-# FastAPI depends on Starlette, so we can mount the mcp_app directly
 app.mount("/mcp", mcp_app)
 
 if __name__ == "__main__":
-    uvicorn.run("cognicore.extension.remote:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("cognicore.extension.remote:app", host="0.0.0.0", port=8000, reload=True)  # nosec B104

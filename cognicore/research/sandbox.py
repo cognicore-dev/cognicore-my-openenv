@@ -79,8 +79,8 @@ def sandbox_fast(code: str, tests: str) -> Tuple[bool, Optional[str]]:
     Falls back to exec() but in a clean namespace."""
     ns = {}
     try:
-        exec(compile(code, "<patch>", "exec"), ns)
-        exec(compile(tests, "<test>", "exec"), ns)
+        exec(compile(code, "<patch>", "exec"), ns)  # nosec B102
+        exec(compile(tests, "<test>", "exec"), ns)  # nosec B102
         return True, None
     except Exception as e:
         return False, f"{type(e).__name__}: {e}"

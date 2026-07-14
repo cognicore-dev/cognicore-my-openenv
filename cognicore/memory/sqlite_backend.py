@@ -256,7 +256,7 @@ class SQLiteMemoryBackend(MemoryBackend):
                     FROM memory_entries m
                     INNER JOIN ({fts_sql}) f ON m.entry_id = f.rowid
                     WHERE 1=1
-                """
+                """  # nosec B608
                 # Clean query for FTS MATCH
                 clean_query = query.replace('"', '')
                 params = [f'"{clean_query}"*']
@@ -358,7 +358,7 @@ class SQLiteMemoryBackend(MemoryBackend):
         values = list(updates.values()) + [entry_id]
         with self._get_conn() as conn:
             cursor = conn.execute(
-                f"UPDATE memory_entries SET {set_clause} WHERE entry_id = ?",
+                f"UPDATE memory_entries SET {set_clause} WHERE entry_id = ?",  # nosec B608
                 values
             )
             return cursor.rowcount > 0

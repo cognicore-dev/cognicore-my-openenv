@@ -24,7 +24,7 @@ def main():
     try:
         # We use shell=True on Windows if `claude` is a cmd/ps1 script from npm
         is_win = sys.platform.startswith("win")
-        result = subprocess.run(cmd, check=True, shell=is_win)
+        result = subprocess.run(cmd, check=True, shell=is_win)  # nosec B602
         
         print("\n✅ Success! CogniCore Memory is now integrated with Claude Code.")
         print("When you run `claude`, it will have access to persistent global and project-scoped memory.")

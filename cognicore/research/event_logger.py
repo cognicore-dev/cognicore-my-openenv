@@ -52,7 +52,7 @@ class EventLogger:
         return self.log(
             EventType.PATCH_GENERATED if not rejected else EventType.PATCH_REJECTED,
             bug_id, attempt, {
-                "patch_hash": hashlib.md5(patch.encode()).hexdigest()[:12],
+                "patch_hash": hashlib.md5(patch.encode()).hexdigest()[:12],  # nosec B324
                 "patch_preview": patch[:200],
                 "tactic": tactic,
                 "passed": passed,

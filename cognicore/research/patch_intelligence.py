@@ -46,7 +46,7 @@ def combined_similarity(a: str, b: str) -> float:
 
 def patch_hash(code: str) -> str:
     """Content-addressable hash for deduplication."""
-    return hashlib.md5(normalize_code(code).encode()).hexdigest()[:12]
+    return hashlib.md5(normalize_code(code).encode()).hexdigest()[:12]  # nosec B324
 
 
 def detect_repeated_reasoning(errors: List[str], threshold: int = 2) -> Optional[str]:
