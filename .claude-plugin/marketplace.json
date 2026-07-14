@@ -1,0 +1,8 @@
+{
+  "name": "CogniCore Beta Marketplace",
+  "plugins": [
+    {
+      "path": "claude-plugin"
+    }
+  ]
+}
