@@ -50,11 +50,11 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Kaushalt2004/cognicore-my-openenv"
-Documentation = "https://github.com/Kaushalt2004/cognicore-my-openenv#readme"
-Repository = "https://github.com/Kaushalt2004/cognicore-my-openenv"
-Issues = "https://github.com/Kaushalt2004/cognicore-my-openenv/issues"
-Changelog = "https://github.com/Kaushalt2004/cognicore-my-openenv/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/cognicore-dev/cognicore-my-openenv"
+Documentation = "https://github.com/cognicore-dev/cognicore-my-openenv#readme"
+Repository = "https://github.com/cognicore-dev/cognicore-my-openenv"
+Issues = "https://github.com/cognicore-dev/cognicore-my-openenv/issues"
+Changelog = "https://github.com/cognicore-dev/cognicore-my-openenv/blob/main/CHANGELOG.md"
 
 [project.scripts]
 cognicore = "cognicore.cli:main"

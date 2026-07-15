@@ -1,6 +1,6 @@
 # CogniCore Memory for Claude Desktop
 
-Give Claude persistent, long-term memory across all your chats and projects using [CogniCore](https://github.com/Kaushalt2004/cognicore-my-openenv).
+Give Claude persistent, long-term memory across all your chats and projects using [CogniCore](https://github.com/cognicore-dev/cognicore-my-openenv).
 
 This extension provides local-first, privacy-respecting memory via SQLite.
 

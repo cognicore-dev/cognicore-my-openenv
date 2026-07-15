@@ -20,7 +20,7 @@ With the release of version 1.0.0, CogniCore introduces the **Living Agent Stack
 6. **Oracle (`cognicore.oracle`)**: A predictive simulation wrapper that uses environment models to foresee outcomes, evaluate risks, and explain planned trajectories.
 7. **DreamEngine (`cognicore.dream`)**: Generates synthetic experiences (dreams), adversarial edge-cases (nightmares), and hallucinates goal-directed action sequences.
 
-## Existing Modules (v0.9.1)
+## Existing Modules
 - **cognicore.immune**: Biological-inspired safety components (NexusShield, ThreatDetector, AntibodyStore, Quarantine, RLDefender).
 - **cognicore.replay**: Event stores, task replayers, branch comparators, trajectory exporters, and timeline visualizers.
 - **cognicore.memory**: Graph, SQLite, and TF-IDF memory backends.
@@ -44,7 +44,7 @@ pip install cognicore-env
 **From source:**
 
 ```bash
-git clone https://github.com/Kaushalt2004/cognicore-my-openenv.git
+git clone https://github.com/cognicore-dev/cognicore-my-openenv.git
 cd cognicore-my-openenv
 pip install -e .
 ```
@@ -53,7 +53,7 @@ pip install -e .
 
 ```bash
 python -c "import cognicore; print(cognicore.__version__)"
-# Expected: 0.9.3
+# Expected: 0.9.5
 ```
 
 ### 3. Add Memory to Your Agent
@@ -475,7 +475,7 @@ agent = cognicore.AutoLearner()
 
 ## Requirements
 
-- **Python:** 3.9, 3.10, 3.11, or 3.12
+- **Python:** 3.10, 3.11, or 3.12
 - **OS:** Windows, macOS, Linux
 - **Dependencies:** None (base install). Optional extras for ML/LLM/server features.
 
@@ -483,4 +483,4 @@ agent = cognicore.AutoLearner()
 
 ## License
 
-MIT License — built by [Kaushalt2004](https://github.com/Kaushalt2004)
+MIT License — built by [Kaushalt2004](https://github.com/Kaushalt2004). Maintained at [cognicore-dev/cognicore-my-openenv](https://github.com/cognicore-dev/cognicore-my-openenv).

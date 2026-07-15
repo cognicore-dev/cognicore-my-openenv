@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- Synced contributor docs and package metadata to `cognicore-dev/cognicore-my-openenv`, package version `0.9.5`, and Python 3.10+
+
 ## [1.0.0] - 2026-07-06
 
 ### Added

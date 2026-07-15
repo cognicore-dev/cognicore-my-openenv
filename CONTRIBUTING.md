@@ -23,7 +23,7 @@ This guide covers everything you need to go from fork to merged PR.
 
 ## Getting Started
 
-1. **Fork** the repository on GitHub: [github.com/Kaushalt2004/cognicore-my-openenv](https://github.com/Kaushalt2004/cognicore-my-openenv)
+1. **Fork** the repository on GitHub: [github.com/cognicore-dev/cognicore-my-openenv](https://github.com/cognicore-dev/cognicore-my-openenv)
 
 2. **Clone your fork** locally:
    ```bash
@@ -40,7 +40,7 @@ This guide covers everything you need to go from fork to merged PR.
    ```bash
    pytest tests/
    ```
-   All 525 tests should pass. If any fail, please open an issue before proceeding.
+   All tests should pass (currently 660+). If any fail, please open an issue before proceeding.
 
 5. **Create a feature branch**:
    ```bash
@@ -330,7 +330,7 @@ class MyFrameworkAdapter:
 
 ## Testing Conventions
 
-CogniCore has **525 tests** and we intend to keep them all green.
+CogniCore has **660+ tests** and we intend to keep them all green.
 
 ### File naming
 
@@ -379,7 +379,7 @@ We use **Ruff** for linting and formatting.
 |---|---|
 | Formatter | Ruff |
 | Line length | **120** |
-| Target Python | 3.9+ |
+| Target Python | 3.10+ |
 | Docstrings | Google style |
 
 ### Running Ruff
@@ -470,7 +470,7 @@ Releases are managed by maintainers. Here's the process for reference:
 1. **Update version** in `pyproject.toml`:
    ```toml
    [project]
-   version = "0.9.4"
+   version = "0.9.5"
    ```
 
 2. **Update `CHANGELOG.md`** with all changes under a new version heading, following [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
@@ -478,12 +478,12 @@ Releases are managed by maintainers. Here's the process for reference:
 3. **Create a release commit**:
    ```bash
    git add pyproject.toml CHANGELOG.md
-   git commit -m "release: v0.9.4"
+   git commit -m "release: v0.9.5"
    ```
 
 4. **Tag the release**:
    ```bash
-   git tag v0.9.4
+   git tag v0.9.5
    git push origin main --tags
    ```
 
@@ -499,7 +499,7 @@ Releases are managed by maintainers. Here's the process for reference:
 
 ## Questions?
 
-- **Issues:** [github.com/Kaushalt2004/cognicore-my-openenv/issues](https://github.com/Kaushalt2004/cognicore-my-openenv/issues)
-- **Discussions:** [github.com/Kaushalt2004/cognicore-my-openenv/discussions](https://github.com/Kaushalt2004/cognicore-my-openenv/discussions)
+- **Issues:** [github.com/cognicore-dev/cognicore-my-openenv/issues](https://github.com/cognicore-dev/cognicore-my-openenv/issues)
+- **Discussions:** [github.com/cognicore-dev/cognicore-my-openenv/discussions](https://github.com/cognicore-dev/cognicore-my-openenv/discussions)
 
 Thank you for helping make CogniCore NEXUS better! 🚀

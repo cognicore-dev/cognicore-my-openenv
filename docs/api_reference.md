@@ -1,6 +1,6 @@
 # CogniCore API Reference
 
-> **Version:** 0.9.3 | **License:** MIT | **Python:** 3.9+
+> **Version:** 0.9.5 | **License:** MIT | **Python:** 3.10+
 
 ---
 
