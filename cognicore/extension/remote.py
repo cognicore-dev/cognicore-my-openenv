@@ -2,7 +2,7 @@ import os
 import hashlib
 from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException, Depends
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from mcp.server.fastmcp import FastMCP, Context
 import uvicorn
@@ -191,6 +191,39 @@ mcp_app = mcp.sse_app()
 @app.get("/health")
 def health_check():
     return {"status": "ok", "version": "1.0"}
+
+# Mock OAuth Flow for Claude Web Marketplace
+@app.get("/.well-known/oauth-authorization-server")
+def oauth_metadata(request: Request):
+    base_url = str(request.base_url).rstrip("/")
+    return {
+        "issuer": base_url,
+        "registration_endpoint": f"{base_url}/register",
+        "authorization_endpoint": f"{base_url}/authorize",
+        "token_endpoint": f"{base_url}/token",
+        "grant_types_supported": ["authorization_code"],
+        "response_types_supported": ["code"]
+    }
+
+@app.post("/register")
+def register_client():
+    return {
+        "client_id": "cognicore_mock_client",
+        "client_secret": "cognicore_mock_secret"
+    }
+
+@app.get("/authorize")
+def authorize(redirect_uri: str, state: str):
+    return RedirectResponse(url=f"{redirect_uri}?code=mock_auth_code&state={state}")
+
+@app.post("/token")
+def token():
+    return {
+        "access_token": "mock_access_token",
+        "token_type": "Bearer",
+        "expires_in": 31536000
+    }
+
 
 
 
