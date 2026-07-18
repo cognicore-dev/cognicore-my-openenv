@@ -304,8 +304,17 @@ def authorize(redirect_uri: str, state: str):
 
 @app.post("/token")
 async def token(request: Request):
+    # Generate a real JWT token instead of a mock string
+    import time
+    payload = {
+        "sub": "claude_web_user",
+        "iat": int(time.time()),
+        "exp": int(time.time()) + 31536000
+    }
+    access_token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    
     return {
-        "access_token": "mock_access_token",
+        "access_token": access_token,
         "token_type": "Bearer",
         "expires_in": 31536000
     }
