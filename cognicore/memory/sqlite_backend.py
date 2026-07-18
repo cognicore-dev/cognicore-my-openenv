@@ -245,6 +245,7 @@ class SQLiteMemoryBackend(MemoryBackend):
         with self._get_conn() as conn:
             # If query is not empty, use FTS5 INNER JOIN to avoid full-table scans. 
             # If empty, limit to recent items to prevent O(N) memory load.
+            rows = []
             if query.strip():
                 # Build FTS5 token prefix query: each word becomes word* for prefix matching
                 # This is the correct FTS5 syntax; quoted phrase + wildcard is NOT supported.
@@ -263,6 +264,42 @@ class SQLiteMemoryBackend(MemoryBackend):
                     WHERE 1=1
                 """  # nosec B608
                 params = [fts_tokens]
+            
+                if category:
+                    sql += " AND m.category = ?"
+                    params.append(category)
+                if scope:
+                    sql += " AND m.scope = ?"
+                    params.append(scope.value)
+                if scope_id:
+                    sql += " AND m.scope_id = ?"
+                    params.append(scope_id)
+
+                try:
+                    cursor = conn.execute(sql, params)
+                    rows = cursor.fetchall()
+                except Exception as e:
+                    logger.warning(f"FTS5 search failed: {e}")
+                    rows = []
+
+                # --- FALLBACK: if FTS5 returned nothing, try a simple LIKE scan ---
+                # This handles stale/missing FTS index (e.g. DB predates triggers).
+                if not rows:
+                    logger.info("FTS5 returned no results; falling back to LIKE scan")
+                    like_sql = "SELECT m.*, 0 as bm25_score FROM memory_entries m WHERE m.text LIKE ?"
+                    like_params = [f"%{clean_query}%"]
+                    if category:
+                        like_sql += " AND m.category = ?"
+                        like_params.append(category)
+                    if scope:
+                        like_sql += " AND m.scope = ?"
+                        like_params.append(scope.value)
+                    if scope_id:
+                        like_sql += " AND m.scope_id = ?"
+                        like_params.append(scope_id)
+                    like_sql += " ORDER BY m.timestamp DESC LIMIT 1000"
+                    cursor = conn.execute(like_sql, like_params)  # nosec B608
+                    rows = cursor.fetchall()
             else:
                 sql = """
                     SELECT m.*, 0 as bm25_score
@@ -270,22 +307,20 @@ class SQLiteMemoryBackend(MemoryBackend):
                     WHERE 1=1
                 """
                 params = []
-            
-            if category:
-                sql += " AND m.category = ?"
-                params.append(category)
-            if scope:
-                sql += " AND m.scope = ?"
-                params.append(scope.value)
-            if scope_id:
-                sql += " AND m.scope_id = ?"
-                params.append(scope_id)
-                
-            if not query.strip():
-                sql += " ORDER BY m.timestamp DESC LIMIT 1000"
 
-            cursor = conn.execute(sql, params)
-            rows = cursor.fetchall()
+                if category:
+                    sql += " AND m.category = ?"
+                    params.append(category)
+                if scope:
+                    sql += " AND m.scope = ?"
+                    params.append(scope.value)
+                if scope_id:
+                    sql += " AND m.scope_id = ?"
+                    params.append(scope_id)
+
+                sql += " ORDER BY m.timestamp DESC LIMIT 1000"
+                cursor = conn.execute(sql, params)
+                rows = cursor.fetchall()
             
             results = []
             for row in rows:
