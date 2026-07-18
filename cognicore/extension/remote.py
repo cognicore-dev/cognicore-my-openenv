@@ -33,9 +33,9 @@ def get_user_id(request_obj) -> str:
     
     # If it's a Starlette Request
     if hasattr(request_obj, "headers"):
-        auth = request_obj.headers.get("Authorization")
-        if auth and auth.startswith("Bearer "):
-            token = auth.split(" ")[1]
+        auth = request_obj.headers.get("Authorization", "")
+        if auth and auth.lower().startswith("bearer "):
+            token = auth[7:].strip()
         elif request_obj.query_params:
             token = request_obj.query_params.get("token")
             
@@ -44,18 +44,18 @@ def get_user_id(request_obj) -> str:
         # Try to get Starlette request if available
         starlette_req = getattr(request_obj, "request", None)
         if starlette_req and hasattr(starlette_req, "headers"):
-            auth = starlette_req.headers.get("Authorization")
-            if auth and auth.startswith("Bearer "):
-                token = auth.split(" ")[1]
+            auth = starlette_req.headers.get("Authorization", "")
+            if auth and auth.lower().startswith("bearer "):
+                token = auth[7:].strip()
         
         # Fallback to JSON-RPC meta if passed by client
         if not token and hasattr(request_obj, "meta") and request_obj.meta:
-            auth = request_obj.meta.get("Authorization")
-            if auth and auth.startswith("Bearer "):
-                token = auth.split(" ")[1]
+            auth = request_obj.meta.get("Authorization", "")
+            if auth and auth.lower().startswith("bearer "):
+                token = auth[7:].strip()
 
     if not token:
-        raise HTTPException(status_code=401, detail="Missing or invalid Bearer token")
+        raise HTTPException(status_code=401, detail="Missing or invalid Bearer token in get_user_id")
         
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
@@ -214,8 +214,8 @@ class AuthMiddleware:
             query = scope.get("query_string", b"").decode("utf-8")
             
             token = None
-            if auth and auth.startswith("Bearer "):
-                token = auth.split(" ")[1]
+            if auth and auth.lower().startswith("bearer "):
+                token = auth[7:].strip()
             elif "token=" in query:
                 from urllib.parse import parse_qs
                 parsed = parse_qs(query)
@@ -228,12 +228,15 @@ class AuthMiddleware:
                         message["status"] = 401
                         message["headers"] = [(b"content-type", b"text/plain")]
                     elif message["type"] == "http.response.body":
-                        message["body"] = b"Missing or invalid Bearer token"
+                        header_keys = ", ".join([k.decode("utf-8") for k in headers.keys()])
+                        message["body"] = f"Missing or invalid Bearer token. Received headers: {header_keys}".encode("utf-8")
                     await send(message)
                 
                 # Mock a 401 response directly
                 await send({"type": "http.response.start", "status": 401, "headers": [(b"content-type", b"text/plain")]})
-                await send({"type": "http.response.body", "body": b"Missing or invalid Bearer token"})
+                header_keys = ", ".join([k.decode("utf-8") for k in headers.keys()])
+                error_msg = f"Missing or invalid Bearer token. Received headers: {header_keys}"
+                await send({"type": "http.response.body", "body": error_msg.encode("utf-8")})
                 return
 
             try:
@@ -242,9 +245,9 @@ class AuthMiddleware:
                     await send({"type": "http.response.start", "status": 401, "headers": [(b"content-type", b"text/plain")]})
                     await send({"type": "http.response.body", "body": b"JWT missing 'sub' claim"})
                     return
-            except jwt.InvalidTokenError:
+            except jwt.InvalidTokenError as e:
                 await send({"type": "http.response.start", "status": 401, "headers": [(b"content-type", b"text/plain")]})
-                await send({"type": "http.response.body", "body": b"Invalid JWT"})
+                await send({"type": "http.response.body", "body": f"Invalid JWT: {str(e)}".encode("utf-8")})
                 return
                 
         return await self.app(scope, receive, send)
