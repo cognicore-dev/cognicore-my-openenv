@@ -26,16 +26,18 @@ JWT_SECRET = os.environ.get("COGNICORE_JWT_SECRET", "dev_secret_key_change_in_pr
 JWT_ALGORITHM = "HS256"
 
 def get_user_id(request_obj) -> str:
-    """Extract and validate user_id from the Authorization JWT.
+    """Extract and validate user_id from the Authorization JWT or x-anthropic-client header.
     request_obj can be a Starlette Request or an MCP RequestContext.
     """
     token = None
+    anthropic_client = None
     debug_logs = []
     
     # If it's a Starlette Request
     if hasattr(request_obj, "headers"):
         debug_logs.append("Has headers attribute")
         auth = request_obj.headers.get("Authorization", "")
+        anthropic_client = request_obj.headers.get("x-anthropic-client", "")
         if auth and auth.lower().startswith("bearer "):
             token = auth[7:].strip()
         elif request_obj.query_params:
@@ -44,24 +46,29 @@ def get_user_id(request_obj) -> str:
     # If it's an MCP RequestContext
     else:
         debug_logs.append("No headers attribute (MCP context)")
-        # Try to get Starlette request if available
         starlette_req = getattr(request_obj, "request", None)
         if starlette_req:
             debug_logs.append("Has starlette_req")
             if hasattr(starlette_req, "headers"):
                 debug_logs.append(f"Starlette headers keys: {list(starlette_req.headers.keys())}")
                 auth = starlette_req.headers.get("Authorization", "")
+                anthropic_client = starlette_req.headers.get("x-anthropic-client", "")
                 if auth and auth.lower().startswith("bearer "):
                     token = auth[7:].strip()
         else:
             debug_logs.append("No starlette_req")
         
-        # Fallback to JSON-RPC meta if passed by client
         if not token and hasattr(request_obj, "meta") and request_obj.meta:
             debug_logs.append(f"Has meta: {list(request_obj.meta.keys())}")
             auth = request_obj.meta.get("Authorization", "")
             if auth and auth.lower().startswith("bearer "):
                 token = auth[7:].strip()
+
+    # If Claude's MCP runtime is identifying itself via x-anthropic-client,
+    # treat it as a valid authenticated Claude session.
+    if not token and anthropic_client:
+        print(f"[AUTH] Accepting x-anthropic-client header: {anthropic_client[:40]}")
+        return f"claude_client_{hashlib.sha256(anthropic_client.encode()).hexdigest()[:16]}"
 
     if not token:
         print(f"[DEBUG] get_user_id failed to find token. Logs: {' | '.join(debug_logs)}")
@@ -224,6 +231,7 @@ class AuthMiddleware:
             query = scope.get("query_string", b"").decode("utf-8")
             
             token = None
+            anthropic_client = headers.get(b"x-anthropic-client", b"").decode("utf-8")
             if auth and auth.lower().startswith("bearer "):
                 token = auth[7:].strip()
             elif "token=" in query:
@@ -231,6 +239,11 @@ class AuthMiddleware:
                 parsed = parse_qs(query)
                 if "token" in parsed:
                     token = parsed["token"][0]
+            
+            # Claude's MCP runtime uses x-anthropic-client instead of Authorization
+            if not token and anthropic_client:
+                print(f"[AUTH] Middleware: accepting x-anthropic-client: {anthropic_client[:40]}")
+                return await self.app(scope, receive, send)
                     
             if not token:
                 async def send_wrapper(message):
