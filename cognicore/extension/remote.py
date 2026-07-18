@@ -25,18 +25,38 @@ security = HTTPBearer()
 JWT_SECRET = os.environ.get("COGNICORE_JWT_SECRET", "dev_secret_key_change_in_prod")
 JWT_ALGORITHM = "HS256"
 
-def get_user_id(request: Request) -> str:
-    """Extract and validate user_id from the Authorization JWT."""
-    auth = request.headers.get("Authorization")
+def get_user_id(request_obj) -> str:
+    """Extract and validate user_id from the Authorization JWT.
+    request_obj can be a Starlette Request or an MCP RequestContext.
+    """
     token = None
-    if auth and auth.startswith("Bearer "):
-        token = auth.split(" ")[1]
+    
+    # If it's a Starlette Request
+    if hasattr(request_obj, "headers"):
+        auth = request_obj.headers.get("Authorization")
+        if auth and auth.startswith("Bearer "):
+            token = auth.split(" ")[1]
+        elif request_obj.query_params:
+            token = request_obj.query_params.get("token")
+            
+    # If it's an MCP RequestContext
     else:
-        token = request.query_params.get("token")
+        # Try to get Starlette request if available
+        starlette_req = getattr(request_obj, "request", None)
+        if starlette_req and hasattr(starlette_req, "headers"):
+            auth = starlette_req.headers.get("Authorization")
+            if auth and auth.startswith("Bearer "):
+                token = auth.split(" ")[1]
         
+        # Fallback to JSON-RPC meta if passed by client
+        if not token and hasattr(request_obj, "meta") and request_obj.meta:
+            auth = request_obj.meta.get("Authorization")
+            if auth and auth.startswith("Bearer "):
+                token = auth.split(" ")[1]
+
     if not token:
-        # Bypass for local testing with Claude Web
-        return "test_user_1"
+        raise HTTPException(status_code=401, detail="Missing or invalid Bearer token")
+        
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         user_id = payload.get("sub")
@@ -56,12 +76,11 @@ def get_db_path_for_user(user_id: str) -> str:
 
 def get_backend(ctx: Context):
     """Dynamically resolve the backend for the current request context."""
-    request = ctx.request_context
-    if not request:
+    if not ctx.request_context:
         raise RuntimeError("No request context available. Make sure to use StreamableHTTP or SSE transport with Starlette.")
     
-    # In FastMCP, ctx.request_context is the Starlette Request object from the POST /message
-    user_id = get_user_id(request)
+    # ctx.request_context is mcp.shared.context.RequestContext
+    user_id = get_user_id(ctx.request_context)
     db_path = get_db_path_for_user(user_id)
     
     from cognicore.memory import SQLiteMemoryBackend
@@ -175,6 +194,62 @@ class StreamingHeadersMiddleware:
 
         await self.app(scope, receive, send_wrapper)
 
+class AuthMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+            
+        path = scope.get("path", "")
+        # Protect only the /mcp endpoints
+        if path.startswith("/mcp"):
+            # Allow OPTIONS for CORS
+            if scope.get("method") == "OPTIONS":
+                return await self.app(scope, receive, send)
+                
+            headers = dict(scope.get("headers", []))
+            auth = headers.get(b"authorization", b"").decode("utf-8")
+            query = scope.get("query_string", b"").decode("utf-8")
+            
+            token = None
+            if auth and auth.startswith("Bearer "):
+                token = auth.split(" ")[1]
+            elif "token=" in query:
+                from urllib.parse import parse_qs
+                parsed = parse_qs(query)
+                if "token" in parsed:
+                    token = parsed["token"][0]
+                    
+            if not token:
+                async def send_wrapper(message):
+                    if message["type"] == "http.response.start":
+                        message["status"] = 401
+                        message["headers"] = [(b"content-type", b"text/plain")]
+                    elif message["type"] == "http.response.body":
+                        message["body"] = b"Missing or invalid Bearer token"
+                    await send(message)
+                
+                # Mock a 401 response directly
+                await send({"type": "http.response.start", "status": 401, "headers": [(b"content-type", b"text/plain")]})
+                await send({"type": "http.response.body", "body": b"Missing or invalid Bearer token"})
+                return
+
+            try:
+                payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+                if not payload.get("sub"):
+                    await send({"type": "http.response.start", "status": 401, "headers": [(b"content-type", b"text/plain")]})
+                    await send({"type": "http.response.body", "body": b"JWT missing 'sub' claim"})
+                    return
+            except jwt.InvalidTokenError:
+                await send({"type": "http.response.start", "status": 401, "headers": [(b"content-type", b"text/plain")]})
+                await send({"type": "http.response.body", "body": b"Invalid JWT"})
+                return
+                
+        return await self.app(scope, receive, send)
+
+app.add_middleware(AuthMiddleware)
 app.add_middleware(StreamingHeadersMiddleware)
 
 app.add_middleware(
