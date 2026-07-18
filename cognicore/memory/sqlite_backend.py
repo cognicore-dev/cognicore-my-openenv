@@ -246,6 +246,11 @@ class SQLiteMemoryBackend(MemoryBackend):
             # If query is not empty, use FTS5 INNER JOIN to avoid full-table scans. 
             # If empty, limit to recent items to prevent O(N) memory load.
             if query.strip():
+                # Build FTS5 token prefix query: each word becomes word* for prefix matching
+                # This is the correct FTS5 syntax; quoted phrase + wildcard is NOT supported.
+                clean_query = query.replace('"', '').replace("'", '').strip()
+                fts_tokens = ' '.join(f'{w}*' for w in clean_query.split() if w)
+                
                 fts_sql = """
                     SELECT rowid, rank as bm25_score
                     FROM memory_fts
@@ -257,9 +262,7 @@ class SQLiteMemoryBackend(MemoryBackend):
                     INNER JOIN ({fts_sql}) f ON m.entry_id = f.rowid
                     WHERE 1=1
                 """  # nosec B608
-                # Clean query for FTS MATCH
-                clean_query = query.replace('"', '')
-                params = [f'"{clean_query}"*']
+                params = [fts_tokens]
             else:
                 sql = """
                     SELECT m.*, 0 as bm25_score
