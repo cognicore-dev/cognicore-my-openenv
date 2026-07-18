@@ -30,9 +30,11 @@ def get_user_id(request_obj) -> str:
     request_obj can be a Starlette Request or an MCP RequestContext.
     """
     token = None
+    debug_logs = []
     
     # If it's a Starlette Request
     if hasattr(request_obj, "headers"):
+        debug_logs.append("Has headers attribute")
         auth = request_obj.headers.get("Authorization", "")
         if auth and auth.lower().startswith("bearer "):
             token = auth[7:].strip()
@@ -41,21 +43,29 @@ def get_user_id(request_obj) -> str:
             
     # If it's an MCP RequestContext
     else:
+        debug_logs.append("No headers attribute (MCP context)")
         # Try to get Starlette request if available
         starlette_req = getattr(request_obj, "request", None)
-        if starlette_req and hasattr(starlette_req, "headers"):
-            auth = starlette_req.headers.get("Authorization", "")
-            if auth and auth.lower().startswith("bearer "):
-                token = auth[7:].strip()
+        if starlette_req:
+            debug_logs.append("Has starlette_req")
+            if hasattr(starlette_req, "headers"):
+                debug_logs.append(f"Starlette headers keys: {list(starlette_req.headers.keys())}")
+                auth = starlette_req.headers.get("Authorization", "")
+                if auth and auth.lower().startswith("bearer "):
+                    token = auth[7:].strip()
+        else:
+            debug_logs.append("No starlette_req")
         
         # Fallback to JSON-RPC meta if passed by client
         if not token and hasattr(request_obj, "meta") and request_obj.meta:
+            debug_logs.append(f"Has meta: {list(request_obj.meta.keys())}")
             auth = request_obj.meta.get("Authorization", "")
             if auth and auth.lower().startswith("bearer "):
                 token = auth[7:].strip()
 
     if not token:
-        raise HTTPException(status_code=401, detail="Missing or invalid Bearer token in get_user_id")
+        print(f"[DEBUG] get_user_id failed to find token. Logs: {' | '.join(debug_logs)}")
+        raise HTTPException(status_code=401, detail=f"Missing or invalid Bearer token in get_user_id. Debug: {' | '.join(debug_logs)}")
         
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
