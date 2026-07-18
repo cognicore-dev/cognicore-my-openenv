@@ -192,7 +192,8 @@ mcp_app = mcp.sse_app()
 def health_check():
     return {"status": "ok", "version": "1.0"}
 
-# Mock OAuth Flow for Claude Web Marketplace
+from fastapi import status
+
 @app.get("/.well-known/oauth-authorization-server")
 def oauth_metadata(request: Request):
     base_url = str(request.base_url).rstrip("/")
@@ -205,11 +206,21 @@ def oauth_metadata(request: Request):
         "response_types_supported": ["code"]
     }
 
-@app.post("/register")
-def register_client():
+@app.post("/register", status_code=status.HTTP_201_CREATED)
+async def register_client(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    
     return {
         "client_id": "cognicore_mock_client",
-        "client_secret": "cognicore_mock_secret"
+        "client_secret": "cognicore_mock_secret",
+        "client_id_issued_at": 1600000000,
+        "client_secret_expires_at": 0,
+        "redirect_uris": body.get("redirect_uris", []),
+        "client_name": body.get("client_name", "Claude Web"),
+        "token_endpoint_auth_method": "client_secret_post",
     }
 
 @app.get("/authorize")
@@ -217,7 +228,7 @@ def authorize(redirect_uri: str, state: str):
     return RedirectResponse(url=f"{redirect_uri}?code=mock_auth_code&state={state}")
 
 @app.post("/token")
-def token():
+async def token(request: Request):
     return {
         "access_token": "mock_access_token",
         "token_type": "Bearer",

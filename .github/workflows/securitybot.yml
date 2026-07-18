@@ -188,33 +188,37 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const fs = require('fs');
-            const data = JSON.parse(fs.readFileSync('security_report.json', 'utf8'));
+            try {
+              const fs = require('fs');
+              const data = JSON.parse(fs.readFileSync('security_report.json', 'utf8'));
 
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-
-            const botComment = comments.find(c =>
-              c.body.includes('🛡️ SecurityBot Scan Results')
-            );
-
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: data.body,
-              });
-            } else {
-              await github.rest.issues.createComment({
+              const { data: comments } = await github.rest.issues.listComments({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.issue.number,
-                body: data.body,
               });
+
+              const botComment = comments.find(c => 
+                c.body && c.body.includes('🛡️ SecurityBot Scan Results')
+              );
+
+              if (botComment) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: botComment.id,
+                  body: data.body,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.issue.number,
+                  body: data.body,
+                });
+              }
+            } catch (error) {
+              console.log('Failed to post comment:', error);
             }
 
       - name: 🚨 Create Security Issue (if critical on main)
@@ -222,15 +226,30 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const fs = require('fs');
-            const data = JSON.parse(fs.readFileSync('security_report.json', 'utf8'));
+            try {
+              const fs = require('fs');
+              const data = JSON.parse(fs.readFileSync('security_report.json', 'utf8'));
 
-            if (data.critical > 0) {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: `🚨 SecurityBot: ${data.critical} critical vulnerability(s) detected`,
-                body: data.body,
-                labels: ['security', 'bug', 'priority: critical'],
-              });
+              if (data.critical > 0) {
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: `🚨 SecurityBot: ${data.critical} critical vulnerability(s) detected`,
+                  body: data.body,
+                  labels: ['security', 'bug', 'priority: critical'],
+                });
+              }
+            } catch (error) {
+              console.log('Failed to create issue:', error);
             }
+
+      - name: 🛑 Fail if Critical Vulnerabilities Found
+        run: |
+          python -c "
+          import json, sys
+          with open('security_report.json') as f:
+              data = json.load(f)
+          if data.get('critical', 0) > 0:
+              print('🚨 CRITICAL VULNERABILITIES FOUND! Blocking PR.')
+              sys.exit(1)
+          "
