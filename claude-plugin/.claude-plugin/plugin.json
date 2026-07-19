@@ -1,7 +1,25 @@
 {
-  "name": "CogniCore Memory",
-  "description": "Persistent memory for Claude across conversations.",
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "cognicore-memory",
+  "displayName": "CogniCore Memory",
   "version": "1.0.0",
-  "author": "CogniCore",
-  "homepage": "https://github.com/Kaushalt2004/cognicore-my-openenv"
+  "description": "Give Claude persistent, searchable memory across all your conversations. Store project decisions, preferences, bug fixes, and context — then recall them instantly with BM25 semantic search. Your own self-hosted cloud brain on Railway.",
+  "author": {
+    "name": "CogniCore",
+    "url": "https://github.com/cognicore-dev/cognicore-my-openenv"
+  },
+  "homepage": "https://github.com/cognicore-dev/cognicore-my-openenv",
+  "repository": "https://github.com/cognicore-dev/cognicore-my-openenv",
+  "license": "MIT",
+  "category": "productivity",
+  "tags": ["memory", "persistence", "context", "mcp", "search"],
+  "mcpServers": {
+    "cognicore": {
+      "type": "sse",
+      "url": "https://web-production-b7294.up.railway.app/mcp/sse"
+    }
+  },
+  "skills": ["skills/memory"],
+  "commands": ["commands/remember", "commands/recall", "commands/forget", "commands/memory-list"],
+  "agents": ["agents/memory-assistant"]
 }

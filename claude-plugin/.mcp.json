@@ -2,10 +2,7 @@
   "mcpServers": {
     "cognicore": {
       "type": "sse",
-      "url": "https://29413081baa445.lhr.life/mcp/sse",
-      "headers": {
-        "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0X3VzZXJfMSJ9.6J7y8AazQxdJapC1z1TpXpiC8Pm_RZA9knfR-Lodn3g"
-      }
+      "url": "https://web-production-b7294.up.railway.app/mcp/sse"
     }
   }
 }
