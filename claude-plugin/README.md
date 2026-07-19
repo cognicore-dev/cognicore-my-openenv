@@ -1,41 +1,56 @@
-# CogniCore Memory Plugin
+# CogniCore Memory — Claude Plugin
 
-> Give Claude persistent, searchable memory across all your conversations.
+> Give Claude a memory that survives across conversations.
 
 ---
 
-## What it does
+## The Problem
 
-CogniCore Memory connects Claude to a self-hosted cloud memory backend. Every important fact, project decision, preference, or bug fix you discuss can be stored and recalled — across sessions, across projects, across time.
+Claude forgets everything when a conversation ends. Every time you start a new chat, you have to re-explain your project, your preferences, your stack.
 
-**Without CogniCore:** Claude forgets everything the moment a conversation ends.  
-**With CogniCore:** Claude remembers your preferences, your stack, your decisions, and your solutions.
+**CogniCore fixes that.**
+
+---
+
+## What It Does
+
+CogniCore lets Claude store and recall information across sessions. You can save decisions, preferences, bug fixes, or any fact — and Claude will remember them the next time you ask.
+
+| Without CogniCore | With CogniCore |
+|---|---|
+| Re-explain your stack every chat | Claude already knows your stack |
+| Repeat your preferences each session | Claude remembers what you like |
+| Forget which bug was already fixed | Claude can recall the fix |
 
 ---
 
 ## Tools
 
-| Tool | Description |
+These run automatically when you ask Claude to remember or recall something:
+
+| Tool | What it does |
 |---|---|
-| `cognicore_remember` | Store a memory with optional category and scope |
-| `cognicore_recall` | Search memories using BM25 semantic ranking |
-| `cognicore_list` | List recently stored memories |
-| `cognicore_forget` | Delete a memory by ID |
+| `cognicore_remember` | Save a memory |
+| `cognicore_recall` | Search your memories |
+| `cognicore_list` | See all stored memories |
+| `cognicore_forget` | Delete a memory by its ID |
 
 ---
 
 ## Slash Commands
 
-| Command | Description |
+You can also trigger memory directly with slash commands:
+
+| Command | Example |
 |---|---|
-| `/remember <text>` | Store a fact or preference |
-| `/recall <query>` | Search your memories |
-| `/memory-list` | Browse all stored memories |
-| `/forget <id>` | Delete a memory by ID |
+| `/remember <text>` | `/remember I use FastAPI and PostgreSQL` |
+| `/recall <query>` | `/recall what database do I use` |
+| `/memory-list` | Browse everything stored |
+| `/forget <id>` | `/forget 3` |
 
 ---
 
-## Quick Start
+## Quick Example
 
 ```
 /remember This project uses FastAPI and PostgreSQL --scope project
@@ -48,38 +63,42 @@ CogniCore Memory connects Claude to a self-hosted cloud memory backend. Every im
 
 ## How Search Works
 
-Recall uses **BM25 Okapi** — the same ranking algorithm used by Elasticsearch — to find the most relevant memories for any query. Rare, specific terms (like framework names or bug descriptions) score higher than common words. Natural language queries work well:
+When you recall something, CogniCore uses **BM25** — the same algorithm used by Elasticsearch — to find the most relevant memories. Specific terms rank higher than common words. Natural language works well:
 
-- `"who built this"` → finds memories mentioning the person
+- `"who built this"` → finds the memory mentioning the person
 - `"auth bug fix"` → finds debugging memories about authentication
-- `"my preferred stack"` → finds user-scoped preference memories
+- `"my preferred stack"` → finds your preference memories
 
 ---
 
 ## Scopes
 
-- **`user`** — Personal preferences, global facts about you (default)
-- **`project`** — Codebase-specific decisions, architectural choices
+When saving a memory, you can optionally tag it with a scope:
+
+- **`user`** — personal preferences that apply everywhere (this is the default)
+- **`project`** — decisions specific to the current codebase
 
 ---
 
 ## Privacy
 
-- All memories are stored in **your own Railway deployment** — no data is sent to CogniCore servers.
-- Memories are isolated per user by a deterministic hash of your Claude client identity.
-- You can delete any memory at any time with `/forget <id>` or `cognicore_forget`.
+- Your memories are stored in **your own Railway deployment** — not on CogniCore's servers.
+- Each user's memories are isolated by a unique hash of their Claude identity.
+- You can delete any memory at any time with `/forget <id>`.
 
 ---
 
 ## Self-Hosting
 
-Deploy your own CogniCore backend in under 5 minutes:
+Deploy your own CogniCore memory backend to Railway in under 5 minutes:
 
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template)
 
-Set `JWT_SECRET` in your Railway environment, then update the MCP server URL in `.mcp.json`.
+After deploying:
+1. Set `JWT_SECRET` in your Railway environment variables
+2. Update the server URL in `.mcp.json` to point to your deployment
 
-See the [full deployment guide](https://github.com/cognicore-dev/cognicore-my-openenv#deployment).
+See the [deployment guide](https://github.com/cognicore-dev/cognicore-my-openenv#deployment) for full instructions.
 
 ---
 
