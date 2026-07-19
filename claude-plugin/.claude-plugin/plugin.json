@@ -1,5 +1,4 @@
 {
-  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "cognicore-memory",
   "displayName": "CogniCore Memory",
   "version": "1.0.0",
@@ -8,18 +7,7 @@
     "name": "CogniCore",
     "url": "https://github.com/cognicore-dev/cognicore-my-openenv"
   },
-  "homepage": "https://github.com/cognicore-dev/cognicore-my-openenv",
-  "repository": "https://github.com/cognicore-dev/cognicore-my-openenv",
   "license": "MIT",
-  "category": "productivity",
-  "tags": ["memory", "persistence", "context", "mcp", "search"],
-  "mcpServers": {
-    "cognicore": {
-      "type": "sse",
-      "url": "https://web-production-b7294.up.railway.app/mcp/sse"
-    }
-  },
-  "skills": ["skills/memory"],
-  "commands": ["commands/remember", "commands/recall", "commands/forget", "commands/memory-list"],
-  "agents": ["agents/memory-assistant"]
+  "repository": "https://github.com/cognicore-dev/cognicore-my-openenv",
+  "homepage": "https://github.com/cognicore-dev/cognicore-my-openenv"
 }
