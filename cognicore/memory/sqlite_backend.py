@@ -1,7 +1,10 @@
 import json
 import logging
+import math
+import re
 import sqlite3
 import time
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -282,24 +285,13 @@ class SQLiteMemoryBackend(MemoryBackend):
                     logger.warning(f"FTS5 search failed: {e}")
                     rows = []
 
-                # --- FALLBACK: if FTS5 returned nothing, try a simple LIKE scan ---
-                # This handles stale/missing FTS index (e.g. DB predates triggers).
+                # --- FALLBACK: FTS5 returned nothing — run BM25 over full corpus ---
                 if not rows:
-                    logger.info("FTS5 returned no results; falling back to LIKE scan")
-                    like_sql = "SELECT m.*, 0 as bm25_score FROM memory_entries m WHERE m.text LIKE ?"
-                    like_params = [f"%{clean_query}%"]
-                    if category:
-                        like_sql += " AND m.category = ?"
-                        like_params.append(category)
-                    if scope:
-                        like_sql += " AND m.scope = ?"
-                        like_params.append(scope.value)
-                    if scope_id:
-                        like_sql += " AND m.scope_id = ?"
-                        like_params.append(scope_id)
-                    like_sql += " ORDER BY m.timestamp DESC LIMIT 1000"
-                    cursor = conn.execute(like_sql, like_params)  # nosec B608
-                    rows = cursor.fetchall()
+                    logger.info("FTS5 returned no results; running BM25 fallback")
+                    return self._fallback_search(
+                        conn, query, top_k, category, scope, scope_id
+                    )
+
             else:
                 sql = """
                     SELECT m.*, 0 as bm25_score
@@ -350,6 +342,117 @@ class SQLiteMemoryBackend(MemoryBackend):
             
             event_bus.publish("on_search", query=query, top_k=top_k, results=final_results)
             return final_results
+
+    # ------------------------------------------------------------------
+    # BM25 Semantic Search (zero extra deps, uses stdlib math only)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _tokenize(text: str) -> List[str]:
+        """Simple whitespace + punctuation tokenizer (mirrors TFIDFMemoryBackend)."""
+        if not text:
+            return []
+        text = text.lower()
+        text = re.sub(r"[^a-z0-9\s]", " ", text)
+        return [t for t in text.split() if len(t) > 1]
+
+    def _bm25_search(self, rows: list, query: str, top_k: int,
+                     category: Optional[str], scope: Optional[MemoryScope],
+                     scope_id: Optional[str]) -> List[SearchResult]:
+        """BM25 Okapi ranking over a list of sqlite3.Row objects.
+        
+        This gives proper term-importance scoring so natural-language queries
+        like "who built CogniCore" correctly rank memories mentioning
+        "built" and "CogniCore" even when stop-words differ.
+        """
+        if not rows:
+            return []
+
+        q_tokens = self._tokenize(query)
+        if not q_tokens:
+            return []
+
+        # Build per-document token lists
+        texts = [row["text"] or "" for row in rows]
+        tokenized = [self._tokenize(t) for t in texts]
+
+        # Document frequency for IDF
+        N = len(tokenized)
+        df: Dict[str, int] = defaultdict(int)
+        for toks in tokenized:
+            for tok in set(toks):
+                df[tok] += 1
+
+        # BM25 hyper-parameters (standard values)
+        k1, b = 1.5, 0.75
+        avgdl = sum(len(t) for t in tokenized) / N if N else 1
+
+        scores = []
+        for idx, toks in enumerate(tokenized):
+            row = rows[idx]
+            # Apply hard filters
+            if category and (row["category"] or "") != category:
+                continue
+            if scope and (row["scope"] or "") != scope.value:
+                continue
+            if scope_id and (row["scope_id"] or "") != scope_id:
+                continue
+
+            dl = len(toks) or 1
+            tf_map = Counter(toks)
+            score = 0.0
+            for tok in q_tokens:
+                if tok not in tf_map:
+                    continue
+                idf = math.log((N - df[tok] + 0.5) / (df[tok] + 0.5) + 1)
+                tf = tf_map[tok]
+                score += idf * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * dl / avgdl))
+            scores.append((score, idx))
+
+        scores.sort(key=lambda x: x[0], reverse=True)
+        results = []
+        for score, idx in scores[:top_k]:
+            if score <= 0:
+                break
+            entry = self._row_to_entry(rows[idx])
+            results.append(SearchResult(entry=entry, score=score, source="bm25"))
+        return results
+
+    def _fallback_search(self, conn, query: str, top_k: int,
+                         category: Optional[str], scope: Optional[MemoryScope],
+                         scope_id: Optional[str]) -> List[SearchResult]:
+        """Load all rows and run BM25; fall back to LIKE only for empty corpora."""
+        all_sql = "SELECT *, 0 as bm25_score FROM memory_entries ORDER BY timestamp DESC"
+        all_rows = conn.execute(all_sql).fetchall()
+
+        if not all_rows:
+            return []
+
+        results = self._bm25_search(all_rows, query, top_k, category, scope, scope_id)
+        if results:
+            logger.info("BM25 fallback found %d results", len(results))
+            return results
+
+        # Last resort: LIKE scan (handles very short corpora where BM25 scores all 0)
+        logger.info("BM25 scored 0; falling back to LIKE scan")
+        clean_query = query.replace('"', '').replace("'", '').strip()
+        like_sql = "SELECT *, 0 as bm25_score FROM memory_entries WHERE text LIKE ?"
+        like_params: List = [f"%{clean_query}%"]
+        if category:
+            like_sql += " AND category = ?"
+            like_params.append(category)
+        if scope:
+            like_sql += " AND scope = ?"
+            like_params.append(scope.value)
+        if scope_id:
+            like_sql += " AND scope_id = ?"
+            like_params.append(scope_id)
+        like_sql += " ORDER BY timestamp DESC LIMIT 1000"
+        like_rows = conn.execute(like_sql, like_params).fetchall()  # nosec B608
+        return [
+            SearchResult(entry=self._row_to_entry(r), score=1.0, source="like")
+            for r in like_rows[:top_k]
+        ]
 
     def get_by_category(self, category: str, top_k: int = 5,
                         success_filter: Optional[bool] = None) -> List[MemoryEntry]:
