@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from cognicore.memory import SQLiteMemoryBackend, MemoryEntry, MemoryScope
+from cognicore.memory.decompose import decompose
 
 logger = logging.getLogger("cognicore.extension")
 
@@ -99,157 +100,105 @@ def create_extension_server() -> "FastMCP":
 
     @mcp.tool()
     def cognicore_remember(text: str, category: str = "general", scope: str = "user") -> str:
-        """Store information that is likely to be useful in future conversations or tasks, 
-        such as user preferences, project decisions, constraints, recurring facts, 
-        successful procedures, or important corrections. Do not store trivial conversational details.
-        
-        Args:
-            text: The fact, preference, or decision to store.
-            category: Optional category for grouping related memories. Defaults to 'general'.
-            scope: The scope of the memory. Must be 'user' (global preferences) or 'project' (current project).
-            
-        Returns:
-            A success message confirming storage and the assigned memory ID.
-        """
+        """Store a fact, preference, or decision. Auto-decomposes compound text into atomic facts."""
         _ensure_backend()
         
         try:
             mem_scope = MemoryScope(scope.lower())
         except ValueError:
-            return f"Error: Invalid scope '{scope}'. Must be 'user' or 'project'."
+            return "Error: scope must be 'user' or 'project'."
             
         scope_id = _get_project_id() if mem_scope == MemoryScope.PROJECT else ""
         
-        entry = MemoryEntry(
-            text=text,
-            category=category,
-            scope=mem_scope,
-            scope_id=scope_id,
-            memory_type="semantic"
-        )
-        
-        try:
-            entry_id = _backend.store(entry)
-            return f"Successfully stored memory in category '{category}' (scope: {mem_scope.value}).\nID: {entry_id}"
-        except Exception as e:
-            logger.error(f"Failed to store memory: {e}")
-            return f"Error storing memory: {str(e)}"
+        # Atomic decomposition: split paragraphs into independently searchable facts
+        facts = decompose(text)
+        ids = []
+        for fact in facts:
+            entry = MemoryEntry(
+                text=fact,
+                category=category,
+                scope=mem_scope,
+                scope_id=scope_id,
+                memory_type="semantic"
+            )
+            try:
+                ids.append(str(_backend.store(entry)))
+            except Exception as e:
+                logger.error(f"Failed to store fact: {e}")
+                return f"Error: {e}"
+
+        if len(ids) == 1:
+            return f"OK id={ids[0]}"
+        return f"OK {len(ids)} facts: {','.join(ids)}"
 
     @mcp.tool()
-    def cognicore_recall(query: str, category: str = "", scope: str = "user", top_k: int = 5) -> str:
-        """Search persistent CogniCore memory for information relevant to the user's current request. 
-        Use this when previous preferences, project decisions, constraints, facts, 
-        or prior solutions may help answer the request.
-        
-        Args:
-            query: The search terms to find relevant memories.
-            category: Optional category filter.
-            scope: The scope to search in. Must be 'user' or 'project'.
-            top_k: Maximum number of results to return.
-            
-        Returns:
-            A formatted list of matching memories or a message if none found.
-        """
+    def cognicore_recall(query: str, category: str = "", scope: str = "user", top_k: int = 3) -> str:
+        """Search memory. Returns matching facts."""
         _ensure_backend()
         
         try:
             mem_scope = MemoryScope(scope.lower())
         except ValueError:
-            return f"Error: Invalid scope '{scope}'. Must be 'user' or 'project'."
+            return "Error: scope must be 'user' or 'project'."
             
         scope_id = _get_project_id() if mem_scope == MemoryScope.PROJECT else None
         
         try:
-            category_filter = category if category else None
             results = _backend.search(
                 query=query, 
                 top_k=top_k, 
-                category=category_filter,
+                category=category if category else None,
                 scope=mem_scope,
                 scope_id=scope_id
             )
             
             if not results:
-                return f"No memories found matching '{query}' in scope '{mem_scope.value}'."
-                
-            lines = [f"Found {len(results)} relevant memories:"]
-            for i, result in enumerate(results, 1):
-                cat = result.entry.category
-                score = result.score
-                lines.append(f"{i}. [ID: {result.entry.entry_id} | Category: {cat} | Score: {score:.2f}]\n   {result.entry.text}")
-                
-            return "\n".join(lines)
+                return "(none)"
+            # Ultra-compact format: one fact per line, minimal overhead
+            return "\n".join(f"#{r.entry.entry_id}: {r.entry.text}" for r in results)
         except Exception as e:
             logger.error(f"Failed to recall memories: {e}")
-            return f"Error recalling memories: {str(e)}"
+            return f"Error: {e}"
 
     @mcp.tool()
     def cognicore_forget(entry_id: str) -> str:
-        """Delete a specific memory by its ID. Use this when the user explicitly asks 
-        to forget something or when a memory is no longer true or relevant.
-        
-        Args:
-            entry_id: The ID of the memory to delete (obtained via list or recall).
-            
-        Returns:
-            A success message or an error if the ID was not found.
-        """
+        """Delete a memory by ID."""
         _ensure_backend()
         
         try:
             success = _backend.delete(entry_id)
-            if success:
-                return f"Successfully deleted memory with ID {entry_id}."
-            else:
-                return f"Could not find or delete memory with ID {entry_id}."
+            return "OK" if success else "Not found"
         except Exception as e:
             logger.error(f"Failed to delete memory: {e}")
-            return f"Error deleting memory: {str(e)}"
+            return f"Error: {e}"
 
     @mcp.tool()
     def cognicore_list(limit: int = 10, category: str = "", scope: str = "user") -> str:
-        """List recently stored memories, optionally filtered by category and scope.
-        
-        Args:
-            limit: Maximum number of memories to list. Defaults to 10.
-            category: Optional category to filter by.
-            scope: The scope to list. Must be 'user' or 'project'.
-            
-        Returns:
-            A formatted list of recent memories.
-        """
+        """List recent memories."""
         _ensure_backend()
         
         try:
             mem_scope = MemoryScope(scope.lower())
         except ValueError:
-            return f"Error: Invalid scope '{scope}'. Must be 'user' or 'project'."
+            return "Error: scope must be 'user' or 'project'."
             
         scope_id = _get_project_id() if mem_scope == MemoryScope.PROJECT else None
         
         try:
-            # Using search with empty query to take advantage of scope filtering in SQLite backend
-            category_filter = category if category else None
             results = _backend.search(
                 query="", 
                 top_k=limit, 
-                category=category_filter,
+                category=category if category else None,
                 scope=mem_scope,
                 scope_id=scope_id
             )
             
             if not results:
-                return f"No memories currently stored in scope '{mem_scope.value}'."
-                
-            lines = [f"Listing {len(results)} recent memories:"]
-            for i, result in enumerate(results, 1):
-                entry = result.entry
-                lines.append(f"{i}. [ID: {entry.entry_id} | Category: {entry.category}]\n   {entry.text}")
-                
-            return "\n".join(lines)
+                return "(empty)"
+            return "\n".join(f"#{r.entry.entry_id}: {r.entry.text}" for r in results)
         except Exception as e:
             logger.error(f"Failed to list memories: {e}")
-            return f"Error listing memories: {str(e)}"
+            return f"Error: {e}"
 
     @mcp.tool()
     def cognicore_stats() -> str:

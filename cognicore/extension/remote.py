@@ -104,78 +104,79 @@ def get_backend(ctx: Context):
     return SQLiteMemoryBackend(db_path)
 
 from cognicore.memory import MemoryEntry, MemoryScope
+from cognicore.memory.decompose import decompose
 
 @mcp.tool()
 def cognicore_remember(text: str, ctx: Context, category: str = "general", scope: str = "user") -> str:
-    """Store information that is likely to be useful in future conversations or tasks."""
+    """Store a fact, preference, or decision. Auto-decomposes compound text into atomic facts."""
     backend = get_backend(ctx)
     try:
         mem_scope = MemoryScope(scope.lower())
     except ValueError:
-        return f"Error: Invalid scope '{scope}'. Must be 'user' or 'project'."
-        
-    entry = MemoryEntry(
-        text=text,
-        category=category,
-        scope=mem_scope,
-        scope_id="", # Remote MCP typically acts as a cloud brain, project scope might need client context
-        memory_type="semantic"
-    )
-    entry_id = backend.store(entry)
-    return f"Successfully stored memory (ID: {entry_id})"
+        return "Error: scope must be 'user' or 'project'."
+
+    # Atomic decomposition: split paragraphs into independently searchable facts
+    facts = decompose(text)
+    ids = []
+    for fact in facts:
+        entry = MemoryEntry(
+            text=fact,
+            category=category,
+            scope=mem_scope,
+            scope_id="",
+            memory_type="semantic"
+        )
+        ids.append(str(backend.store(entry)))
+
+    if len(ids) == 1:
+        return f"OK id={ids[0]}"
+    return f"OK {len(ids)} facts: {','.join(ids)}"
 
 @mcp.tool()
-def cognicore_recall(query: str, ctx: Context, category: str = "", scope: str = "user", top_k: int = 5) -> str:
-    """Search persistent CogniCore memory for information relevant to the user's current request."""
+def cognicore_recall(query: str, ctx: Context, category: str = "", scope: str = "user", top_k: int = 3) -> str:
+    """Search memory. Returns matching facts."""
     backend = get_backend(ctx)
     try:
         mem_scope = MemoryScope(scope.lower())
     except ValueError:
-        return f"Error: Invalid scope '{scope}'. Must be 'user' or 'project'."
-        
+        return "Error: scope must be 'user' or 'project'."
+
     results = backend.search(
-        query=query, 
-        top_k=top_k, 
+        query=query,
+        top_k=top_k,
         category=category if category else None,
         scope=mem_scope
     )
     if not results:
-        return f"No memories found matching '{query}'."
-    lines = [f"Found {len(results)} relevant memories:"]
-    for i, r in enumerate(results, 1):
-        lines.append(f"{i}. [ID: {r.entry.entry_id}] {r.entry.text}")
-    return "\n".join(lines)
+        return "(none)"
+    # Ultra-compact format: one fact per line, minimal overhead
+    return "\n".join(f"#{r.entry.entry_id}: {r.entry.text}" for r in results)
 
 @mcp.tool()
 def cognicore_forget(entry_id: str, ctx: Context) -> str:
-    """Delete a specific memory by its ID."""
+    """Delete a memory by ID."""
     backend = get_backend(ctx)
     success = backend.delete(entry_id)
-    if success:
-        return f"Successfully deleted memory with ID {entry_id}."
-    return f"Could not find or delete memory with ID {entry_id}."
+    return "OK" if success else "Not found"
 
 @mcp.tool()
 def cognicore_list(ctx: Context, limit: int = 10, category: str = "", scope: str = "user") -> str:
-    """List recently stored memories."""
+    """List recent memories."""
     backend = get_backend(ctx)
     try:
         mem_scope = MemoryScope(scope.lower())
     except ValueError:
-        return f"Error: Invalid scope '{scope}'. Must be 'user' or 'project'."
-        
+        return "Error: scope must be 'user' or 'project'."
+
     results = backend.search(
-        query="", 
-        top_k=limit, 
+        query="",
+        top_k=limit,
         category=category if category else None,
         scope=mem_scope
     )
     if not results:
-        return "No memories currently stored."
-    lines = [f"Listing {len(results)} recent memories:"]
-    for i, r in enumerate(results, 1):
-        lines.append(f"{i}. [ID: {r.entry.entry_id}] {r.entry.text}")
-    return "\n".join(lines)
+        return "(empty)"
+    return "\n".join(f"#{r.entry.entry_id}: {r.entry.text}" for r in results)
 
 # Create the FastAPI app
 app = FastAPI(title="CogniCore Remote MCP Server")
